@@ -1,5 +1,5 @@
 {
-  "name": "clayui",
+  "name": "@manavarya0909/clayui",
   "version": "1.0.0",
   "description": "Mold your UI like clay. Visual drag-and-drop editor overlay for any running web app — powered by Claude AI.",
   "type": "module",
