@@ -51,6 +51,12 @@ export function createWebSocketHub(port) {
       case 'save':
         emit('save', state.changeQueue.splice(0));
         break;
+      case 'chat':
+        // Treat chat prompts as a special change type so they flow into the batch
+        state.changeQueue.push({ type: 'chat', ...msg.payload });
+        emit('change', { type: 'chat', ...msg.payload });
+        emit('chat', msg.payload);
+        break;
     }
   }
 

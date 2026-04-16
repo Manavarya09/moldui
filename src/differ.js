@@ -44,6 +44,18 @@ export function buildSyncPrompt(changes, framework, sourceHints) {
       case 'clone':
         lines.push(`   Duplicated, inserted at index ${c.index}`);
         break;
+      case 'delete':
+        lines.push(`   Deleted element`);
+        break;
+      case 'wrap':
+        lines.push(`   Wrapped in <${c.wrapperTag || 'div'}>`);
+        break;
+      case 'image':
+        lines.push(`   Image src: ${(c.oldSrc || '').slice(0, 60)} -> ${(c.newSrc || '').slice(0, 60)}`);
+        break;
+      case 'chat':
+        lines.push(`   User prompt: "${c.prompt}"`);
+        break;
     }
     lines.push('');
   }

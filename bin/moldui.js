@@ -4,6 +4,8 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import open from 'open';
+import { mkdirSync, writeFileSync, readdirSync, unlinkSync, existsSync } from 'fs';
+import { join } from 'path';
 import { createProxy } from '../src/proxy.js';
 import { createWebSocketHub } from '../src/websocket.js';
 import { detectDevServer, detectFramework, findAvailablePort } from '../src/detector.js';
@@ -92,6 +94,15 @@ program
       const hub = createWebSocketHub(wsPort);
       const undo = new UndoManager();
       const projectDir = opts.dir;
+
+      // Clean old sync batches + write .gitignore entry
+      cleanOldBatches(projectDir);
+      const moldDir = join(projectDir, '.moldui');
+      mkdirSync(moldDir, { recursive: true });
+      const giPath = join(moldDir, '.gitignore');
+      if (!existsSync(giPath)) writeFileSync(giPath, '*\n!.gitignore\n!README.md\n');
+      const readmePath = join(moldDir, 'README.md');
+      if (!existsSync(readmePath)) writeFileSync(readmePath, '# .moldui\n\nThis directory holds pending visual edits from [moldui](https://github.com/Manavarya09/moldui).\n\nRun `/moldui-sync` in Claude Code to apply pending changes to your source code.\n');
       let debounceTimer = null;
       let pendingChanges = [];
 
@@ -168,7 +179,7 @@ program
     }
   });
 
-// Sync changes to source code via Claude prompt
+// Sync changes to source code by writing batch files that Claude Code picks up
 async function syncChanges(changes, framework, projectDir, hub) {
   hub.sendToBrowser({ type: 'status', payload: { state: 'writing' } });
 
@@ -185,19 +196,51 @@ async function syncChanges(changes, framework, projectDir, hub) {
   const seen = new Set();
   const uniqueHints = allHints.filter(h => { if (seen.has(h.file)) return false; seen.add(h.file); return true; });
 
-  // Build the prompt
-  const prompt = buildSyncPrompt(changes, framework, uniqueHints);
+  // Write the batch to a pending file for Claude Code to pick up via /moldui-sync command
+  const moldDir = join(projectDir, '.moldui');
+  mkdirSync(moldDir, { recursive: true });
+  const batchFile = join(moldDir, `batch-${Date.now()}.json`);
+  const batch = {
+    timestamp: Date.now(),
+    framework,
+    sourceHints: uniqueHints,
+    changes,
+    prompt: buildSyncPrompt(changes, framework, uniqueHints),
+  };
+  writeFileSync(batchFile, JSON.stringify(batch, null, 2), 'utf-8');
 
-  // Write prompt to stdout for Claude Code to pick up
-  // In plugin mode, this would go through the skill system
-  console.log(chalk.gray('\n  ── Sync prompt (' + changes.length + ' changes) ──'));
-  console.log(chalk.dim(prompt.split('\n').map(l => '  ' + l).join('\n')));
-  console.log('');
+  // Pretty print a summary (not the whole prompt — too noisy)
+  console.log(chalk.gray('\n  ── ' + changes.length + ' change' + (changes.length === 1 ? '' : 's') + ' queued → .moldui/' + batchFile.split('/').pop() + ' ──'));
+  for (const c of changes.slice(0, 5)) {
+    const summary = c.type === 'style' ? Object.keys(c.changes || {}).join(', ')
+      : c.type === 'text' ? '"' + (c.oldText || '').slice(0, 20) + '" → "' + (c.newText || '').slice(0, 20) + '"'
+      : c.type === 'reorder' ? 'moved ' + c.fromIndex + ' → ' + c.toIndex
+      : c.type;
+    console.log(chalk.dim('    · [' + c.type + '] ' + (c.element?.tag || 'el') + ' — ' + summary));
+  }
+  if (changes.length > 5) console.log(chalk.dim('    · ...and ' + (changes.length - 5) + ' more'));
+  console.log(chalk.cyan('\n  In Claude Code, run: /moldui-sync'));
+  console.log(chalk.gray('  (or tell Claude to "apply my moldui changes")\n'));
 
-  // Notify browser of completion
+  // Notify browser that the batch is pending
   const file = uniqueHints[0]?.file || 'source';
-  hub.sendToBrowser({ type: 'synced', payload: { file, changes: changes.length } });
+  hub.sendToBrowser({ type: 'synced', payload: { file, changes: changes.length, pending: true } });
   hub.sendToBrowser({ type: 'status', payload: { state: 'idle' } });
+}
+
+// Clean old batch files on startup (keep last 20)
+function cleanOldBatches(projectDir) {
+  const moldDir = join(projectDir, '.moldui');
+  if (!existsSync(moldDir)) return;
+  try {
+    const batches = readdirSync(moldDir)
+      .filter(f => f.startsWith('batch-') && f.endsWith('.json'))
+      .map(f => ({ f, t: parseInt(f.match(/\d+/)?.[0] || '0') }))
+      .sort((a, b) => b.t - a.t);
+    for (const { f } of batches.slice(20)) {
+      try { unlinkSync(join(moldDir, f)); } catch {}
+    }
+  } catch {}
 }
 
 program.parse();

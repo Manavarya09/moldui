@@ -354,5 +354,257 @@
 @keyframes moldui-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
-  margin: 0 2px;
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* v2.0 — Figma-level features                                  */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* Multi-select */
+.moldui-multi-boxes { display: none; position: fixed; top: 0; left: 0; pointer-events: none; z-index: 2; }
+.moldui-multi-box {
+  border: 2px solid #8b5cf6; border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(139,92,246,0.3);
+  pointer-events: none;
+}
+
+/* Context menu */
+.moldui-context-menu {
+  display: none; position: fixed;
+  background: rgba(10,10,15,0.96); backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+  padding: 4px; min-width: 180px; z-index: 8;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  pointer-events: auto;
+}
+.moldui-cm-item {
+  padding: 7px 12px; color: #d1d5db; font: 400 12px/1 system-ui;
+  border-radius: 5px; cursor: pointer; transition: all 0.1s;
+}
+.moldui-cm-item:hover { background: rgba(59,130,246,0.2); color: #fff; }
+
+/* Layers Panel */
+.moldui-layers-panel {
+  display: none; position: fixed; top: 56px; left: 8px;
+  width: 240px; max-height: calc(100vh - 100px);
+  flex-direction: column;
+  background: rgba(10,10,15,0.96); backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  color: #d1d5db; font: 11px/1.4 system-ui; z-index: 5;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  overflow: hidden; pointer-events: auto;
+}
+.moldui-lp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.moldui-lp-title { font: 600 12px/1 system-ui; color: #f3f4f6; }
+.moldui-lp-toggle {
+  background: none; border: none; color: #6b7280;
+  cursor: pointer; padding: 2px 4px; font-size: 11px;
+}
+.moldui-lp-toggle:hover { color: #fff; }
+.moldui-lp-tree {
+  flex: 1; overflow-y: auto; padding: 4px 0;
+  scrollbar-width: thin; scrollbar-color: #333 transparent;
+}
+.moldui-lp-tree::-webkit-scrollbar { width: 5px; }
+.moldui-lp-tree::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.moldui-lp-node {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px; cursor: pointer; user-select: none;
+  color: #9ca3af; transition: background 0.1s;
+}
+.moldui-lp-node:hover { background: rgba(59,130,246,0.1); color: #d1d5db; }
+.moldui-lp-node.selected { background: rgba(59,130,246,0.25); color: #60a5fa; }
+.moldui-lp-caret { width: 12px; font-size: 9px; color: #6b7280; flex-shrink: 0; }
+.moldui-lp-icon { width: 14px; text-align: center; color: #6b7280; font-size: 10px; flex-shrink: 0; }
+.moldui-lp-label {
+  font: 11px/1 monospace; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Cmd+K Palette */
+.moldui-palette {
+  display: none; position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+  width: 540px; max-width: calc(100vw - 40px);
+  background: rgba(10,10,15,0.97); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  z-index: 10; overflow: hidden; pointer-events: auto;
+}
+.moldui-palette-input {
+  width: 100%; background: transparent; border: none; outline: none;
+  color: #f3f4f6; font: 400 14px/1.4 system-ui;
+  padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  box-sizing: border-box;
+}
+.moldui-palette-input::placeholder { color: #4b5563; }
+.moldui-palette-results {
+  max-height: 400px; overflow-y: auto; padding: 6px;
+  scrollbar-width: thin; scrollbar-color: #333 transparent;
+}
+.moldui-palette-results::-webkit-scrollbar { width: 5px; }
+.moldui-palette-results::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.moldui-palette-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 14px; border-radius: 7px; cursor: pointer;
+  color: #d1d5db; transition: background 0.1s;
+}
+.moldui-palette-row:hover, .moldui-palette-row.selected {
+  background: rgba(59,130,246,0.2); color: #fff;
+}
+.moldui-palette-label { font: 500 12px/1 monospace; color: #60a5fa; flex-shrink: 0; }
+.moldui-palette-text {
+  font: 400 12px/1.4 system-ui; color: #9ca3af;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.moldui-palette-empty { padding: 20px; text-align: center; color: #4b5563; font: 13px/1 system-ui; }
+
+/* AI Chat Panel */
+.moldui-chat-panel {
+  display: none; position: fixed; bottom: 70px; right: 12px;
+  width: 360px; height: 480px; flex-direction: column;
+  background: rgba(10,10,15,0.96); backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  color: #d1d5db; font: 12px/1.4 system-ui; z-index: 7;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  pointer-events: auto;
+}
+.moldui-chat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.moldui-chat-title { font: 600 13px/1 system-ui; color: #f3f4f6; }
+.moldui-chat-close {
+  background: none; border: none; color: #6b7280; cursor: pointer;
+  font-size: 14px; padding: 0 4px;
+}
+.moldui-chat-close:hover { color: #fff; }
+.moldui-chat-messages {
+  flex: 1; overflow-y: auto; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  scrollbar-width: thin; scrollbar-color: #333 transparent;
+}
+.moldui-chat-msg { display: flex; }
+.moldui-chat-msg-user { justify-content: flex-end; }
+.moldui-chat-msg-ai { justify-content: flex-start; }
+.moldui-chat-bubble {
+  padding: 8px 12px; border-radius: 10px; max-width: 85%;
+  font: 12px/1.45 system-ui; white-space: pre-wrap; word-break: break-word;
+}
+.moldui-chat-msg-user .moldui-chat-bubble { background: #3b82f6; color: #fff; }
+.moldui-chat-msg-ai .moldui-chat-bubble { background: rgba(255,255,255,0.06); color: #d1d5db; }
+.moldui-chat-input-wrap {
+  display: flex; gap: 6px; padding: 10px; border-top: 1px solid rgba(255,255,255,0.06);
+}
+.moldui-chat-input {
+  flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 8px 10px; color: #e5e7eb;
+  font: 12px/1.4 system-ui; outline: none; resize: none;
+}
+.moldui-chat-input:focus { border-color: #3b82f6; }
+.moldui-chat-send {
+  background: #3b82f6; color: #fff; border: none;
+  padding: 0 14px; border-radius: 6px; font: 500 12px/1 system-ui;
+  cursor: pointer; transition: background 0.15s;
+}
+.moldui-chat-send:hover { background: #2563eb; }
+.moldui-chat-hint {
+  padding: 6px 14px; font: 400 10px/1.3 system-ui; color: #6b7280;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Image Replace */
+.moldui-img-replace-btn {
+  background: transparent; color: #10b981; border: none;
+  padding: 7px 11px; border-radius: 7px; font: 500 11px/1 system-ui;
+  cursor: pointer; transition: all 0.15s; margin-left: 3px;
+  border-left: 1px solid rgba(255,255,255,0.08); padding-left: 14px;
+}
+.moldui-img-replace-btn:hover { background: rgba(16,185,129,0.2); }
+
+/* Shortcut Cheatsheet */
+.moldui-cheatsheet {
+  display: none; position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 520px; max-height: 80vh;
+  flex-direction: column;
+  background: rgba(10,10,15,0.98); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+  color: #d1d5db; font: 12px/1.4 system-ui; z-index: 9;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  pointer-events: auto; overflow: hidden;
+}
+.moldui-cs-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.moldui-cs-title { font: 600 14px/1 system-ui; color: #f3f4f6; }
+.moldui-cs-close {
+  background: none; border: none; color: #6b7280;
+  cursor: pointer; font-size: 14px; padding: 0 4px;
+}
+.moldui-cs-close:hover { color: #fff; }
+.moldui-cs-body {
+  flex: 1; overflow-y: auto; padding: 8px 8px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;
+}
+.moldui-cs-section { padding: 8px 12px; }
+.moldui-cs-section-title {
+  font: 600 10px/1 system-ui; color: #6b7280;
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
+}
+.moldui-cs-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 0; font: 12px/1.3 system-ui;
+}
+.moldui-cs-key {
+  background: rgba(255,255,255,0.06); padding: 3px 8px;
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 4px;
+  font: 500 11px/1 monospace; color: #60a5fa; white-space: nowrap;
+}
+.moldui-cs-desc { color: #9ca3af; margin-left: 12px; text-align: right; }
+
+/* Onboarding Tour */
+.moldui-tour-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.35); z-index: 8; pointer-events: auto;
+}
+.moldui-tour-bubble {
+  display: none; max-width: 320px;
+  background: rgba(10,10,15,0.98); backdrop-filter: blur(24px);
+  border: 1px solid rgba(59,130,246,0.3); border-radius: 12px;
+  padding: 16px 18px; z-index: 9;
+  box-shadow: 0 8px 32px rgba(59,130,246,0.2);
+  pointer-events: auto;
+}
+.moldui-tour-text { color: #e5e7eb; font: 13px/1.5 system-ui; margin-bottom: 10px; }
+.moldui-tour-progress {
+  color: #6b7280; font: 10px/1 system-ui; margin-bottom: 12px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.moldui-tour-btns { display: flex; justify-content: flex-end; gap: 6px; }
+.moldui-tour-skip {
+  background: transparent; color: #9ca3af; border: none;
+  padding: 6px 12px; border-radius: 6px; font: 500 11px/1 system-ui;
+  cursor: pointer;
+}
+.moldui-tour-skip:hover { color: #fff; }
+.moldui-tour-next {
+  background: #3b82f6; color: #fff; border: none;
+  padding: 6px 14px; border-radius: 6px; font: 500 11px/1 system-ui;
+  cursor: pointer;
+}
+.moldui-tour-next:hover { background: #2563eb; }
+
+/* Zoom Badge */
+.moldui-zoom-badge {
+  position: fixed; bottom: 62px; right: 12px;
+  background: rgba(10,10,15,0.92); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+  padding: 5px 10px; font: 500 11px/1 monospace; color: #9ca3af;
+  cursor: pointer; z-index: 4; pointer-events: auto;
+  transition: color 0.15s;
+}
+.moldui-zoom-badge:hover { color: #fff; }

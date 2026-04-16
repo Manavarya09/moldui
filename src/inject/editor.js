@@ -930,5 +930,538 @@
   }
   function hideDim() { dimLabel.style.display = 'none'; }
 
-  console.log('[moldui] Editor loaded. Click to select, drag to move, double-click to edit text, S for styles.');
+  // ═════════════════════════════════════════════════════════
+  // v2.0 — Figma-level features
+  // ═════════════════════════════════════════════════════════
+
+  // ── Multi-Select ─────────────────────────────────────────
+  var multiSelected = [];
+  var multiBoxContainer = mk('div', 'moldui-multi-boxes', overlay);
+
+  function renderMultiSelectBoxes() {
+    while (multiBoxContainer.firstChild) multiBoxContainer.removeChild(multiBoxContainer.firstChild);
+    multiBoxContainer.style.display = 'block';
+    multiSelected.forEach(function(el) {
+      var r = el.getBoundingClientRect();
+      var box = mk('div', 'moldui-multi-box', multiBoxContainer);
+      box.style.cssText = 'position:fixed;top:' + r.top + 'px;left:' + r.left + 'px;width:' + r.width + 'px;height:' + r.height + 'px;pointer-events:none;';
+    });
+  }
+  function hideMultiSelectBoxes() {
+    while (multiBoxContainer.firstChild) multiBoxContainer.removeChild(multiBoxContainer.firstChild);
+    multiBoxContainer.style.display = 'none';
+  }
+  function syncMulti() { if (multiSelected.length > 0) renderMultiSelectBoxes(); }
+  window.addEventListener('scroll', syncMulti, true);
+  window.addEventListener('resize', syncMulti);
+
+  // Intercept clicks for shift-select (higher priority than existing handler)
+  document.addEventListener('click', function(e) {
+    if (state.mode !== 'select') return;
+    if (!e.shiftKey) { if (multiSelected.length > 0) { multiSelected = []; hideMultiSelectBoxes(); } return; }
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || isEditor(el)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (multiSelected.length === 0 && state.selected) multiSelected.push(state.selected);
+    var idx = multiSelected.indexOf(el);
+    if (idx >= 0) multiSelected.splice(idx, 1);
+    else multiSelected.push(el);
+    renderMultiSelectBoxes();
+  }, true);
+
+  // ── Right-Click Context Menu ─────────────────────────────
+  var contextMenu = mk('div', 'moldui-context-menu', overlay);
+  contextMenu.style.pointerEvents = 'auto';
+  var copiedStyles = null;
+  var menuItems = [
+    { label: 'Duplicate', action: 'dup' },
+    { label: 'Hide', action: 'hide' },
+    { label: 'Wrap in <div>', action: 'wrap' },
+    { label: 'Copy Styles', action: 'copy-styles' },
+    { label: 'Paste Styles', action: 'paste-styles' },
+    { label: 'Copy HTML', action: 'copy-html' },
+    { label: 'Copy CSS', action: 'copy-css' },
+    { label: 'Select Parent', action: 'parent' },
+    { label: 'Select Children', action: 'children' },
+    { label: 'Delete', action: 'del' }
+  ];
+  menuItems.forEach(function(it) {
+    var el = document.createElement('div');
+    el.className = 'moldui-cm-item';
+    el.dataset.action = it.action;
+    el.textContent = it.label;
+    contextMenu.appendChild(el);
+  });
+
+  document.addEventListener('contextmenu', function(e) {
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || isEditor(el)) return;
+    e.preventDefault();
+    selectEl(el);
+    contextMenu.style.cssText = 'display:block;position:fixed;top:' + e.clientY + 'px;left:' + e.clientX + 'px;pointer-events:auto;';
+    setTimeout(function() {
+      var r = contextMenu.getBoundingClientRect();
+      if (r.right > window.innerWidth) contextMenu.style.left = (window.innerWidth - r.width - 10) + 'px';
+      if (r.bottom > window.innerHeight) contextMenu.style.top = (window.innerHeight - r.height - 10) + 'px';
+    }, 0);
+  }, true);
+
+  function hideContextMenu() { contextMenu.style.display = 'none'; }
+  document.addEventListener('click', function(e) {
+    if (contextMenu.style.display === 'block' && !contextMenu.contains(e.target)) hideContextMenu();
+  }, true);
+
+  contextMenu.addEventListener('click', function(e) {
+    var it = e.target.closest('.moldui-cm-item');
+    if (!it || !state.selected) return;
+    var a = it.dataset.action;
+    var el = state.selected;
+    hideContextMenu();
+
+    if (a === 'dup') dupSelectedEl();
+    else if (a === 'hide') hideSelectedEl();
+    else if (a === 'wrap') {
+      var wrapper = document.createElement('div');
+      el.parentElement.insertBefore(wrapper, el);
+      wrapper.appendChild(el);
+      selectEl(wrapper);
+      sendChange({ type: 'wrap', element: desc(el), selector: cssPath(el), wrapperTag: 'div', url: location.pathname });
+    }
+    else if (a === 'copy-styles') {
+      copiedStyles = {};
+      var cs = getComputedStyle(el);
+      var props = ['color','backgroundColor','fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','padding','margin','borderRadius','border','boxShadow','opacity','textAlign'];
+      props.forEach(function(p) { copiedStyles[p] = cs[p]; });
+      showShimmer('synced', 'Styles copied');
+    }
+    else if (a === 'paste-styles') {
+      if (!copiedStyles) { showShimmer('error', 'No styles copied'); return; }
+      Object.keys(copiedStyles).forEach(function(p) {
+        var old = getComputedStyle(el)[p];
+        el.style[p] = copiedStyles[p];
+        var ch = { type: 'style', element: desc(el), selector: cssPath(el), changes: { [p]: { from: old, to: copiedStyles[p] } }, url: location.pathname };
+        var se = el, so = old, sv = copiedStyles[p], sp = p;
+        sendChangeWithUndo(ch, function() { se.style[sp] = so; }, function() { se.style[sp] = sv; });
+      });
+      syncSel();
+    }
+    else if (a === 'copy-html') {
+      navigator.clipboard.writeText(el.outerHTML).then(function() { showShimmer('synced', 'HTML copied'); }).catch(function() {});
+    }
+    else if (a === 'copy-css') {
+      var cs = getComputedStyle(el);
+      var css = cssPath(el) + ' {\n';
+      ['color','background-color','font-family','font-size','font-weight','padding','margin','border-radius','box-shadow'].forEach(function(p) {
+        var camel = p.replace(/-([a-z])/g, function(m, c) { return c.toUpperCase(); });
+        var val = cs[camel];
+        if (val && val !== 'none' && val !== 'rgba(0, 0, 0, 0)' && val !== '0px') css += '  ' + p + ': ' + val + ';\n';
+      });
+      css += '}';
+      navigator.clipboard.writeText(css).then(function() { showShimmer('synced', 'CSS copied'); }).catch(function() {});
+    }
+    else if (a === 'parent') { if (el.parentElement) selectEl(el.parentElement); }
+    else if (a === 'children') { if (el.children.length > 0) { multiSelected = Array.from(el.children); renderMultiSelectBoxes(); deselectEl(); } }
+    else if (a === 'del') {
+      var parent = el.parentElement, next = el.nextSibling;
+      el.remove();
+      var ch = { type: 'delete', element: desc(el), selector: cssPath(el), url: location.pathname };
+      var savedEl = el, sp2 = parent, sn = next;
+      sendChangeWithUndo(ch, function() { if (sn) sp2.insertBefore(savedEl, sn); else sp2.appendChild(savedEl); }, function() { savedEl.remove(); });
+      deselectEl();
+    }
+  });
+
+  // ── Layers Panel ─────────────────────────────────────────
+  var layersPanel = mk('div', 'moldui-layers-panel', overlay);
+  layersPanel.style.pointerEvents = 'auto';
+  var lpHeader = mk('div', 'moldui-lp-header', layersPanel);
+  var lpTitle = mk('span', 'moldui-lp-title', lpHeader);
+  lpTitle.textContent = 'Layers';
+  var lpToggleBtn = document.createElement('button');
+  lpToggleBtn.className = 'moldui-lp-toggle';
+  lpToggleBtn.textContent = '\u2715';
+  lpHeader.appendChild(lpToggleBtn);
+  var lpTree = mk('div', 'moldui-lp-tree', layersPanel);
+  var layersPanelOpen = false;
+  var expandedNodes = new Set();
+
+  function toggleLayersPanel() {
+    layersPanelOpen = !layersPanelOpen;
+    if (layersPanelOpen) { layersPanel.style.display = 'flex'; renderLayersTree(); }
+    else layersPanel.style.display = 'none';
+  }
+  lpToggleBtn.addEventListener('click', toggleLayersPanel);
+
+  function renderLayersTree() {
+    while (lpTree.firstChild) lpTree.removeChild(lpTree.firstChild);
+    if (!document.body) return;
+    Array.from(document.body.children).forEach(function(ch) {
+      if (ch.id === '__moldui-host__') return;
+      buildLayerNode(ch, lpTree, 0);
+    });
+  }
+
+  function buildLayerNode(el, parent, depth) {
+    var node = document.createElement('div');
+    node.className = 'moldui-lp-node' + (state.selected === el ? ' selected' : '');
+    node.style.paddingLeft = (depth * 14 + 8) + 'px';
+    var hasKids = el.children.length > 0;
+    var exp = expandedNodes.has(el);
+    var caret = document.createElement('span');
+    caret.className = 'moldui-lp-caret';
+    caret.textContent = hasKids ? (exp ? '\u25BE' : '\u25B8') : '';
+    caret.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!hasKids) return;
+      if (exp) expandedNodes.delete(el); else expandedNodes.add(el);
+      renderLayersTree();
+    });
+    node.appendChild(caret);
+    var icon = document.createElement('span');
+    icon.className = 'moldui-lp-icon';
+    var tag = el.tagName.toLowerCase();
+    icon.textContent = tag === 'a' ? '\u2197' : tag === 'button' ? '\u25A2' : /^h[1-6]$/.test(tag) ? 'H' : tag === 'img' ? '\u{1F5BC}' : '\u25AB';
+    node.appendChild(icon);
+    var lbl = document.createElement('span');
+    lbl.className = 'moldui-lp-label';
+    lbl.textContent = elLabel(el);
+    node.appendChild(lbl);
+    node.addEventListener('click', function(e) { if (e.target === caret) return; selectEl(el); });
+    parent.appendChild(node);
+    if (hasKids && exp) {
+      Array.from(el.children).forEach(function(ch) {
+        if (ch.id === '__moldui-host__') return;
+        buildLayerNode(ch, parent, depth + 1);
+      });
+    }
+  }
+
+  // ── Cmd+K Element Search Palette ─────────────────────────
+  var palette = mk('div', 'moldui-palette', overlay);
+  palette.style.pointerEvents = 'auto';
+  var paletteInput = document.createElement('input');
+  paletteInput.className = 'moldui-palette-input';
+  paletteInput.placeholder = 'Search elements by tag, class, id, or text...';
+  paletteInput.type = 'text';
+  palette.appendChild(paletteInput);
+  var paletteResults = mk('div', 'moldui-palette-results', palette);
+  var paletteOpen = false;
+  var paletteIndex = [];
+  var paletteSel = 0;
+
+  function togglePalette() {
+    paletteOpen = !paletteOpen;
+    if (paletteOpen) {
+      palette.style.display = 'block';
+      paletteInput.value = '';
+      paletteInput.focus();
+      buildPaletteIndex();
+      renderPaletteResults('');
+    } else palette.style.display = 'none';
+  }
+  function buildPaletteIndex() {
+    paletteIndex = [];
+    var all = document.querySelectorAll('*');
+    for (var i = 0; i < all.length && paletteIndex.length < 500; i++) {
+      var el = all[i];
+      if (el.id === '__moldui-host__' || (el.closest && el.closest('#__moldui-host__'))) continue;
+      var r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) continue;
+      var txt = (el.textContent || '').trim().slice(0, 60);
+      paletteIndex.push({ el: el, label: elLabel(el), text: txt, keywords: (el.tagName + ' ' + (el.id || '') + ' ' + el.className + ' ' + txt).toLowerCase() });
+    }
+  }
+  function renderPaletteResults(q) {
+    while (paletteResults.firstChild) paletteResults.removeChild(paletteResults.firstChild);
+    q = q.trim().toLowerCase();
+    var matches = q === '' ? paletteIndex.slice(0, 50) : paletteIndex.filter(function(it) { return it.keywords.indexOf(q) >= 0; }).slice(0, 50);
+    paletteSel = 0;
+    matches.forEach(function(it, i) {
+      var row = document.createElement('div');
+      row.className = 'moldui-palette-row' + (i === 0 ? ' selected' : '');
+      var lblS = document.createElement('span');
+      lblS.className = 'moldui-palette-label';
+      lblS.textContent = it.label;
+      row.appendChild(lblS);
+      if (it.text) {
+        var txtS = document.createElement('span');
+        txtS.className = 'moldui-palette-text';
+        txtS.textContent = it.text;
+        row.appendChild(txtS);
+      }
+      row.addEventListener('click', function() { selectEl(it.el); try { it.el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(x) {} togglePalette(); });
+      paletteResults.appendChild(row);
+    });
+    if (matches.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'moldui-palette-empty';
+      empty.textContent = 'No matches';
+      paletteResults.appendChild(empty);
+    }
+  }
+  paletteInput.addEventListener('input', function() { renderPaletteResults(paletteInput.value); });
+  paletteInput.addEventListener('keydown', function(e) {
+    var rows = paletteResults.querySelectorAll('.moldui-palette-row');
+    if (e.key === 'Escape') { togglePalette(); return; }
+    if (e.key === 'Enter') { var r = rows[paletteSel]; if (r) r.click(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (paletteSel < rows.length - 1) paletteSel++; rows.forEach(function(r, i) { r.classList.toggle('selected', i === paletteSel); }); if (rows[paletteSel]) rows[paletteSel].scrollIntoView({ block: 'nearest' }); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); if (paletteSel > 0) paletteSel--; rows.forEach(function(r, i) { r.classList.toggle('selected', i === paletteSel); }); if (rows[paletteSel]) rows[paletteSel].scrollIntoView({ block: 'nearest' }); }
+  });
+
+  // ── AI Chat Panel ────────────────────────────────────────
+  var chatPanel = mk('div', 'moldui-chat-panel', overlay);
+  chatPanel.style.pointerEvents = 'auto';
+  var chatHdr = mk('div', 'moldui-chat-header', chatPanel);
+  var chatT = mk('span', 'moldui-chat-title', chatHdr);
+  chatT.textContent = 'Ask moldui AI';
+  var chatClose = document.createElement('button');
+  chatClose.className = 'moldui-chat-close';
+  chatClose.textContent = '\u2715';
+  chatHdr.appendChild(chatClose);
+  var chatMsgs = mk('div', 'moldui-chat-messages', chatPanel);
+  var chatIn = mk('div', 'moldui-chat-input-wrap', chatPanel);
+  var chatInput = document.createElement('textarea');
+  chatInput.className = 'moldui-chat-input';
+  chatInput.placeholder = 'e.g., "make this more modern" or "increase contrast"';
+  chatInput.rows = 3;
+  chatIn.appendChild(chatInput);
+  var chatSendBtn = document.createElement('button');
+  chatSendBtn.className = 'moldui-chat-send';
+  chatSendBtn.textContent = 'Send';
+  chatIn.appendChild(chatSendBtn);
+  var chatHint = mk('div', 'moldui-chat-hint', chatPanel);
+  chatHint.textContent = 'Your prompt + selected element context is sent to Claude Code.';
+  var chatPanelOpen = false;
+
+  function toggleChatPanel() {
+    chatPanelOpen = !chatPanelOpen;
+    chatPanel.style.display = chatPanelOpen ? 'flex' : 'none';
+    if (chatPanelOpen) chatInput.focus();
+  }
+  chatClose.addEventListener('click', toggleChatPanel);
+  function addChatMsg(role, text) {
+    var m = mk('div', 'moldui-chat-msg moldui-chat-msg-' + role, chatMsgs);
+    var b = mk('div', 'moldui-chat-bubble', m);
+    b.textContent = text;
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  }
+  function doChatSend() {
+    var text = chatInput.value.trim();
+    if (!text) return;
+    addChatMsg('user', text);
+    chatInput.value = '';
+    send({ type: 'chat', payload: { prompt: text, element: state.selected ? desc(state.selected) : null, selector: state.selected ? cssPath(state.selected) : null, url: location.pathname } });
+    addChatMsg('ai', 'Queued for Claude Code — run /moldui-sync to apply');
+  }
+  chatSendBtn.addEventListener('click', doChatSend);
+  chatInput.addEventListener('keydown', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doChatSend(); } });
+
+  // ── Eyedropper + Recent Colors (localStorage) ────────────
+  var recentColors = [];
+  try { recentColors = JSON.parse(localStorage.getItem('__moldui_recent_colors__') || '[]'); } catch(x) {}
+  function addRecentColor(hex) {
+    if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) return;
+    recentColors = [hex].concat(recentColors.filter(function(c) { return c !== hex; })).slice(0, 12);
+    try { localStorage.setItem('__moldui_recent_colors__', JSON.stringify(recentColors)); } catch(x) {}
+  }
+
+  // ── Image Replace (works on selected img) ────────────────
+  var imgReplaceBtn = document.createElement('button');
+  imgReplaceBtn.className = 'moldui-img-replace-btn';
+  imgReplaceBtn.textContent = 'Replace Image';
+  imgReplaceBtn.style.display = 'none';
+  toolbar.appendChild(imgReplaceBtn);
+
+  imgReplaceBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (!state.selected || state.selected.tagName !== 'IMG') return;
+    var url = prompt('Image URL (or leave empty to upload a file):', state.selected.src || '');
+    if (url === null) return;
+    if (url) {
+      var oldSrc = state.selected.src, savedEl = state.selected, newS = url;
+      savedEl.src = newS;
+      sendChangeWithUndo({ type: 'image', element: desc(savedEl), selector: cssPath(savedEl), oldSrc: oldSrc, newSrc: newS, url: location.pathname }, function() { savedEl.src = oldSrc; }, function() { savedEl.src = newS; });
+    } else {
+      var fi = document.createElement('input');
+      fi.type = 'file'; fi.accept = 'image/*';
+      fi.addEventListener('change', function() {
+        var f = fi.files[0]; if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function() {
+          var d = rd.result, se = state.selected, old = se.src;
+          se.src = d;
+          sendChangeWithUndo({ type: 'image', element: desc(se), selector: cssPath(se), oldSrc: old, newSrc: 'data:...(uploaded)', url: location.pathname, dataLength: d.length }, function() { se.src = old; }, function() { se.src = d; });
+        };
+        rd.readAsDataURL(f);
+      });
+      fi.click();
+    }
+  });
+
+  // Patch showToolbar to reveal img-replace when an img is selected
+  var _origShowToolbar = showToolbar;
+  showToolbar = function(el) {
+    _origShowToolbar(el);
+    imgReplaceBtn.style.display = el.tagName === 'IMG' ? 'inline-block' : 'none';
+  };
+
+  // ── Shortcut Cheatsheet (press ?) ────────────────────────
+  var cheatsheet = mk('div', 'moldui-cheatsheet', overlay);
+  cheatsheet.style.pointerEvents = 'auto';
+  var csH = mk('div', 'moldui-cs-header', cheatsheet);
+  var csT = mk('span', 'moldui-cs-title', csH);
+  csT.textContent = 'Keyboard Shortcuts';
+  var csCl = document.createElement('button');
+  csCl.className = 'moldui-cs-close';
+  csCl.textContent = '\u2715';
+  csH.appendChild(csCl);
+  var csB = mk('div', 'moldui-cs-body', cheatsheet);
+  var csGroups = [
+    { section: 'Selection', items: [['Click', 'Select element'], ['Shift+Click', 'Multi-select'], ['Escape', 'Deselect']] },
+    { section: 'Editing', items: [['Double-click', 'Edit text'], ['Drag', 'Move / reorder'], ['Handles', 'Resize'], ['Arrows', 'Nudge 1px'], ['Shift+Arrows', 'Nudge 10px'], ['Delete', 'Hide element']] },
+    { section: 'Panels', items: [['S', 'Style panel'], ['L', 'Layers panel'], ['Cmd+K', 'Search elements'], ['Cmd+/', 'AI chat'], ['?', 'This cheatsheet']] },
+    { section: 'History', items: [['Cmd+Z', 'Undo'], ['Cmd+Shift+Z', 'Redo'], ['Cmd+S', 'Save to source']] },
+    { section: 'Zoom', items: [['Cmd+Scroll', 'Zoom canvas'], ['Cmd+0', 'Reset zoom'], ['Cmd+=', 'Zoom in'], ['Cmd+-', 'Zoom out']] },
+    { section: 'Context Menu (right-click)', items: [['Duplicate', 'Clone'], ['Copy/Paste Styles', 'Transfer'], ['Copy HTML/CSS', 'To clipboard'], ['Wrap', 'In a <div>']] }
+  ];
+  csGroups.forEach(function(g) {
+    var sec = mk('div', 'moldui-cs-section', csB);
+    var st = mk('div', 'moldui-cs-section-title', sec);
+    st.textContent = g.section;
+    g.items.forEach(function(it) {
+      var rw = mk('div', 'moldui-cs-row', sec);
+      var k = mk('span', 'moldui-cs-key', rw);
+      k.textContent = it[0];
+      var d = mk('span', 'moldui-cs-desc', rw);
+      d.textContent = it[1];
+    });
+  });
+  var cheatsheetOpen = false;
+  function toggleCheatsheet() {
+    cheatsheetOpen = !cheatsheetOpen;
+    cheatsheet.style.display = cheatsheetOpen ? 'flex' : 'none';
+  }
+  csCl.addEventListener('click', toggleCheatsheet);
+
+  // ── Onboarding Tour (first launch) ───────────────────────
+  var tourOverlay = mk('div', 'moldui-tour-overlay', overlay);
+  tourOverlay.style.pointerEvents = 'auto';
+  var tourBubble = mk('div', 'moldui-tour-bubble', overlay);
+  tourBubble.style.pointerEvents = 'auto';
+  var tourStep = 0;
+  var tourSteps = [
+    { target: '.moldui-viewport-bar', text: 'Switch viewports to test responsive design. Mobile, tablet, desktop — click to preview.' },
+    { target: '.moldui-action-bar', text: 'Undo, Redo, and Save your visual changes here. Save writes to your source files via Claude.' },
+    { target: null, text: 'Click any element to edit it. Drag to reorder. Double-click to edit text. Press ? for all shortcuts. Happy molding!' }
+  ];
+
+  function showTourStep() {
+    if (tourStep >= tourSteps.length) { endTour(); return; }
+    var s = tourSteps[tourStep];
+    tourOverlay.style.display = 'block';
+    while (tourBubble.firstChild) tourBubble.removeChild(tourBubble.firstChild);
+    var tx = mk('div', 'moldui-tour-text', tourBubble);
+    tx.textContent = s.text;
+    var pr = mk('div', 'moldui-tour-progress', tourBubble);
+    pr.textContent = 'Step ' + (tourStep + 1) + ' of ' + tourSteps.length;
+    var btns = mk('div', 'moldui-tour-btns', tourBubble);
+    var skipB = document.createElement('button');
+    skipB.className = 'moldui-tour-skip';
+    skipB.textContent = 'Skip';
+    skipB.addEventListener('click', endTour);
+    btns.appendChild(skipB);
+    var nextB = document.createElement('button');
+    nextB.className = 'moldui-tour-next';
+    nextB.textContent = tourStep === tourSteps.length - 1 ? 'Got it \u2713' : 'Next \u2192';
+    nextB.addEventListener('click', function() { tourStep++; showTourStep(); });
+    btns.appendChild(nextB);
+
+    if (s.target) {
+      var t = shadow.querySelector(s.target);
+      if (t) {
+        var r = t.getBoundingClientRect();
+        tourBubble.style.cssText = 'display:block;position:fixed;top:' + (r.bottom + 14) + 'px;left:' + Math.max(12, r.left) + 'px;pointer-events:auto;';
+      } else tourBubble.style.cssText = 'display:block;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:auto;';
+    } else tourBubble.style.cssText = 'display:block;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:auto;';
+  }
+  function endTour() {
+    tourOverlay.style.display = 'none';
+    tourBubble.style.display = 'none';
+    try { localStorage.setItem('__moldui_tour_done__', '1'); } catch(x) {}
+  }
+  (function maybeStartTour() {
+    var seen = false;
+    try { seen = localStorage.getItem('__moldui_tour_done__') === '1'; } catch(x) {}
+    if (!seen) setTimeout(showTourStep, 900);
+  })();
+
+  // ── Visual Viewport Frames (override old handler) ────────
+  var bodyFrameStyle = document.createElement('style');
+  bodyFrameStyle.textContent = 'body.moldui-has-frame { background: #0a0a0f !important; min-height: 100vh; transition: background 0.3s; }';
+  document.head.appendChild(bodyFrameStyle);
+
+  // Replace the viewport bar click handler by cloning + re-attaching
+  var newVpBar = vpBar.cloneNode(true);
+  vpBar.parentNode.replaceChild(newVpBar, vpBar);
+  newVpBar.addEventListener('click', function(e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    newVpBar.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    var vp = btn.dataset.vp;
+    var html = document.documentElement, body = document.body;
+    if (vp === 'full') {
+      html.style.maxWidth = ''; html.style.margin = ''; html.style.boxShadow = ''; html.style.borderRadius = ''; html.style.overflow = '';
+      body.classList.remove('moldui-has-frame');
+    } else {
+      var w = parseInt(vp);
+      html.style.maxWidth = w + 'px';
+      html.style.margin = '24px auto 40px';
+      html.style.boxShadow = '0 0 0 8px #1a1a1a, 0 0 0 9px rgba(255,255,255,0.08), 0 24px 60px rgba(0,0,0,0.5)';
+      html.style.borderRadius = w <= 480 ? '32px' : w <= 900 ? '18px' : '8px';
+      html.style.overflow = 'hidden';
+      body.classList.add('moldui-has-frame');
+    }
+  });
+
+  // ── Zoom (Cmd+scroll) ────────────────────────────────────
+  var zoomLevel = 1;
+  var zoomBadge = mk('div', 'moldui-zoom-badge', overlay);
+  zoomBadge.textContent = '100%';
+  zoomBadge.style.pointerEvents = 'auto';
+  zoomBadge.addEventListener('click', function() { zoomLevel = 1; applyZoom(); });
+
+  function applyZoom() {
+    document.documentElement.style.transform = 'scale(' + zoomLevel + ')';
+    document.documentElement.style.transformOrigin = 'top center';
+    zoomBadge.textContent = Math.round(zoomLevel * 100) + '%';
+    if (state.selected) syncSel();
+  }
+  document.addEventListener('wheel', function(e) {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    e.preventDefault();
+    zoomLevel = Math.max(0.25, Math.min(3, zoomLevel + (e.deltaY > 0 ? -0.1 : 0.1)));
+    applyZoom();
+  }, { passive: false });
+
+  // ── Global keyboard: L, Cmd+K, Cmd+/, ?, Cmd+0, Cmd+=, Cmd+- ─
+  document.addEventListener('keydown', function(e) {
+    if (textEdit) return;
+    if (e.key === 'l' && !e.metaKey && !e.ctrlKey && !paletteOpen) { e.preventDefault(); toggleLayersPanel(); }
+    else if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); togglePalette(); }
+    else if ((e.metaKey || e.ctrlKey) && e.key === '/') { e.preventDefault(); toggleChatPanel(); }
+    else if (e.key === '?') { e.preventDefault(); toggleCheatsheet(); }
+    else if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); zoomLevel = 1; applyZoom(); }
+    else if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoomLevel = Math.min(3, zoomLevel + 0.1); applyZoom(); }
+    else if ((e.metaKey || e.ctrlKey) && e.key === '-') { e.preventDefault(); zoomLevel = Math.max(0.25, zoomLevel - 0.1); applyZoom(); }
+  }, true);
+
+  // Patch selectEl to also re-render layers tree
+  var _origSelectEl = selectEl;
+  selectEl = function(el) {
+    _origSelectEl(el);
+    if (layersPanelOpen) renderLayersTree();
+  };
+
+  console.log('[moldui] v2.0 loaded. Press ? for shortcuts. Cmd+K to search, L for layers, Cmd+/ for AI chat.');
 })();
