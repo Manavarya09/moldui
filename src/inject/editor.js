@@ -22,6 +22,9 @@
   // ── State ────────────────────────────────────────────────
   var state = { selected: null, hovered: null, mode: 'select', wsConnected: false };
 
+  // Prevent all form submissions and link navigations while editor is active
+  document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
+
   // ── WebSocket ────────────────────────────────────────────
   var wsPort = window.__MOLDUI_WS_PORT__ || 4445;
   var ws;
@@ -48,6 +51,23 @@
 
   // ── Helpers ──────────────────────────────────────────────
   function isEditor(el) { return el && (el === host || host.contains(el) || el.id === '__moldui-host__'); }
+
+  function getDirectText(el) {
+    // Get visible text content, works for buttons, spans, links, headings, etc.
+    if (!el || !el.textContent) return '';
+    var text = el.textContent.trim();
+    if (!text) return '';
+    // Must be relatively short (actual text, not a container with lots of nested content)
+    if (text.length > 500) return '';
+    // Must have some text nodes (direct or in immediate children)
+    var hasText = false;
+    for (var i = 0; i < el.childNodes.length; i++) {
+      var n = el.childNodes[i];
+      if (n.nodeType === 3 && n.textContent.trim()) { hasText = true; break; }
+      if (n.nodeType === 1 && n.children.length === 0 && n.textContent.trim()) { hasText = true; break; }
+    }
+    return hasText ? text : '';
+  }
 
   function elLabel(el) {
     var s = el.tagName.toLowerCase();
@@ -111,6 +131,54 @@
     handles[pos] = h;
   });
 
+  // ── Spacing Guides ────────────────────────────────────────
+  var guides = mk('div', 'moldui-guides', overlay);
+
+  function showGuides(selRect, hovRect) {
+    while (guides.firstChild) guides.removeChild(guides.firstChild);
+    guides.style.display = 'block';
+
+    // Vertical distance
+    if (hovRect.top > selRect.bottom) {
+      // Below
+      var dist = Math.round(hovRect.top - selRect.bottom);
+      drawGuide(selRect.left + selRect.width / 2, selRect.bottom, selRect.left + selRect.width / 2, hovRect.top, dist);
+    } else if (selRect.top > hovRect.bottom) {
+      // Above
+      var dist = Math.round(selRect.top - hovRect.bottom);
+      drawGuide(selRect.left + selRect.width / 2, hovRect.bottom, selRect.left + selRect.width / 2, selRect.top, dist);
+    }
+
+    // Horizontal distance
+    if (hovRect.left > selRect.right) {
+      var distH = Math.round(hovRect.left - selRect.right);
+      drawGuide(selRect.right, selRect.top + selRect.height / 2, hovRect.left, selRect.top + selRect.height / 2, distH);
+    } else if (selRect.left > hovRect.right) {
+      var distH2 = Math.round(selRect.left - hovRect.right);
+      drawGuide(hovRect.right, selRect.top + selRect.height / 2, selRect.left, selRect.top + selRect.height / 2, distH2);
+    }
+  }
+
+  function drawGuide(x1, y1, x2, y2, dist) {
+    if (dist < 1) return;
+    var line = mk('div', 'moldui-guide-line', guides);
+    var isVert = x1 === x2;
+    if (isVert) {
+      line.style.cssText = 'position:fixed;left:' + x1 + 'px;top:' + Math.min(y1, y2) + 'px;width:1px;height:' + Math.abs(y2 - y1) + 'px;';
+    } else {
+      line.style.cssText = 'position:fixed;left:' + Math.min(x1, x2) + 'px;top:' + y1 + 'px;width:' + Math.abs(x2 - x1) + 'px;height:1px;';
+    }
+    var label = mk('div', 'moldui-guide-label', guides);
+    label.textContent = dist + 'px';
+    var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    label.style.cssText = 'position:fixed;left:' + mx + 'px;top:' + my + 'px;transform:translate(-50%,-50%);';
+  }
+
+  function hideGuides() {
+    while (guides.firstChild) guides.removeChild(guides.firstChild);
+    guides.style.display = 'none';
+  }
+
   function posBox(box, r) {
     box.style.cssText = 'display:block;position:fixed;top:' + r.top + 'px;left:' + r.left + 'px;width:' + r.width + 'px;height:' + r.height + 'px;pointer-events:none;';
   }
@@ -133,6 +201,7 @@
     toolbar.style.display = 'none';
     breadcrumb.style.display = 'none';
     hideStylePanel();
+    hideGuides();
   }
 
   function syncSel() {
@@ -149,11 +218,21 @@
   document.addEventListener('mousemove', function(e) {
     if (state.mode !== 'select') return;
     var el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el || isEditor(el) || el === state.selected) { hovBox.style.display = 'none'; hovLabel.style.display = 'none'; return; }
+    if (!el || isEditor(el) || el === state.selected) {
+      hovBox.style.display = 'none'; hovLabel.style.display = 'none';
+      hideGuides();
+      return;
+    }
     var r = el.getBoundingClientRect();
     posBox(hovBox, r);
     hovLabel.style.cssText = 'display:block;position:fixed;top:' + (r.top - 22) + 'px;left:' + r.left + 'px;pointer-events:none;';
     hovLabel.textContent = elLabel(el);
+    // Show spacing guides between selected and hovered element
+    if (state.selected && el !== state.selected && !isEditor(el)) {
+      showGuides(state.selected.getBoundingClientRect(), el.getBoundingClientRect());
+    } else {
+      hideGuides();
+    }
   }, true);
 
   document.addEventListener('click', function(e) {
@@ -187,31 +266,72 @@
     if (!dragSt) return;
     dragSt.ghost.style.top = (dragSt.r.top + e.clientY - dragSt.y) + 'px';
     dragSt.ghost.style.left = (dragSt.r.left + e.clientX - dragSt.x) + 'px';
-    if (!dragSt.parent) return;
+
+    // Find the container under the cursor (skip the ghost and the dragged element)
+    dragSt.ghost.style.pointerEvents = 'none';
+    dragSt.el.style.pointerEvents = 'none';
+    var dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+    dragSt.el.style.pointerEvents = '';
+
+    if (!dropTarget || isEditor(dropTarget)) return;
+
+    // Find the nearest container (element with children that isn't inline text)
+    var container = dropTarget;
+    while (container && container !== document.body) {
+      var ccs = getComputedStyle(container);
+      var isContainer = ccs.display === 'flex' || ccs.display === 'grid' || ccs.display === 'block' || ccs.display === 'inline-flex';
+      if (isContainer && container.children.length > 0 && container !== dragSt.el) break;
+      container = container.parentElement;
+    }
+    if (!container || container === document.body) container = dragSt.parent;
+
+    // Find insertion point within this container
+    var children = Array.from(container.children).filter(function(c) { return c !== dragSt.el && c !== dragSt.ph; });
     var before = null;
-    dragSt.sibs.forEach(function(s) {
-      if (s === dragSt.el || before) return;
-      var sr = s.getBoundingClientRect();
-      if (e.clientY < sr.top + sr.height / 2) before = s;
-    });
+    for (var i = 0; i < children.length; i++) {
+      var cr = children[i].getBoundingClientRect();
+      // For vertical layouts, check Y; for horizontal, check X
+      var parentCs = getComputedStyle(container);
+      if (parentCs.flexDirection === 'row' || parentCs.flexDirection === 'row-reverse') {
+        if (e.clientX < cr.left + cr.width / 2) { before = children[i]; break; }
+      } else {
+        if (e.clientY < cr.top + cr.height / 2) { before = children[i]; break; }
+      }
+    }
+
+    // Update placeholder
     if (dragSt.ph.parentElement) dragSt.ph.remove();
-    if (before) dragSt.parent.insertBefore(dragSt.ph, before);
-    else dragSt.parent.appendChild(dragSt.ph);
+    if (before) container.insertBefore(dragSt.ph, before);
+    else container.appendChild(dragSt.ph);
+
+    // Track the target container
+    dragSt.targetContainer = container;
   }
 
   function endDrag() {
     if (!dragSt) return;
     var el = dragSt.el, ghost = dragSt.ghost, ph = dragSt.ph, parent = dragSt.parent, startIdx = dragSt.startIdx;
-    var newIdx = startIdx;
+    var targetContainer = dragSt.targetContainer || parent;
+    var newIdx = -1;
+
     if (ph.parentElement) {
-      newIdx = Array.from(parent.children).indexOf(ph);
-      parent.insertBefore(el, ph);
+      newIdx = Array.from(targetContainer.children).indexOf(ph);
+      targetContainer.insertBefore(el, ph);
       ph.remove();
     }
     ghost.remove();
     el.style.opacity = '';
-    if (newIdx !== startIdx) {
-      sendChange({ type: 'reorder', element: desc(el), selector: cssPath(el), fromIndex: startIdx, toIndex: newIdx, siblingCount: dragSt.sibs.length, url: location.pathname });
+    el.style.pointerEvents = '';
+
+    var moved = (targetContainer !== parent) || (newIdx !== startIdx);
+    if (moved) {
+      sendChange({
+        type: 'reorder', element: desc(el), selector: cssPath(el),
+        fromIndex: startIdx, toIndex: newIdx,
+        fromParent: cssPath(parent), toParent: cssPath(targetContainer),
+        siblingCount: Array.from(targetContainer.children).length,
+        url: location.pathname
+      });
     }
     dragSt = null; state.mode = 'select'; selectEl(el);
   }
@@ -221,7 +341,16 @@
 
   function startResize(el, pos, x, y) {
     var cs = getComputedStyle(el);
-    rszSt = { el: el, pos: pos, x: x, y: y, w: parseFloat(cs.width), h: parseFloat(cs.height) };
+    var r = el.getBoundingClientRect();
+    rszSt = {
+      el: el, pos: pos, x: x, y: y,
+      w: r.width, h: r.height,
+      startRect: { top: r.top, left: r.left, width: r.width, height: r.height },
+      minW: parseFloat(cs.minWidth) || 10,
+      minH: parseFloat(cs.minHeight) || 10,
+      maxW: cs.maxWidth === 'none' ? Infinity : parseFloat(cs.maxWidth),
+      maxH: cs.maxHeight === 'none' ? Infinity : parseFloat(cs.maxHeight)
+    };
     state.mode = 'resize';
     showDim(el);
   }
@@ -234,7 +363,8 @@
     if (rszSt.pos.indexOf('w') >= 0) w = rszSt.w - dx;
     if (rszSt.pos.indexOf('s') >= 0) h = rszSt.h + dy;
     if (rszSt.pos.indexOf('n') >= 0) h = rszSt.h - dy;
-    w = Math.max(20, w); h = Math.max(20, h);
+    w = Math.max(rszSt.minW, Math.min(rszSt.maxW, w));
+    h = Math.max(rszSt.minH, Math.min(rszSt.maxH, h));
     rszSt.el.style.width = w + 'px';
     rszSt.el.style.height = h + 'px';
     syncSel(); showDim(rszSt.el);
@@ -261,8 +391,11 @@
   });
 
   document.addEventListener('mousedown', function(e) {
-    if (state.selected && !isEditor(e.target) && e.target === state.selected && state.mode === 'select') {
-      e.preventDefault(); startDrag(state.selected, e.clientX, e.clientY);
+    if (!state.selected || isEditor(e.target) || state.mode !== 'select') return;
+    // Check if click is on the selected element or any of its children
+    if (state.selected.contains(e.target) || e.target === state.selected) {
+      e.preventDefault();
+      startDrag(state.selected, e.clientX, e.clientY);
     }
   }, true);
 
@@ -280,17 +413,34 @@
   var textEdit = null;
 
   document.addEventListener('dblclick', function(e) {
-    var el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el || isEditor(el)) return;
-    var hasText = Array.from(el.childNodes).some(function(n) { return n.nodeType === 3 && n.textContent.trim(); });
-    if (!hasText) return;
-    e.preventDefault(); e.stopPropagation();
-    var old = el.textContent.trim();
-    el.contentEditable = 'true'; el.focus();
+    var target = document.elementFromPoint(e.clientX, e.clientY);
+    if (!target || isEditor(target)) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+
+    // Find the best text-editable element — walk up to find element with actual visible text
+    var el = target;
+    // If the element has no text itself, don't try
+    var text = getDirectText(el);
+    if (!text) {
+      // Try parent — maybe user clicked a span inside a button
+      if (el.parentElement && getDirectText(el.parentElement)) {
+        el = el.parentElement;
+        text = getDirectText(el);
+      } else {
+        return;
+      }
+    }
+
+    var old = text;
+    el.contentEditable = 'true';
+    el.focus();
     state.mode = 'text';
     textEdit = { el: el, old: old };
-    var range = document.createRange(); range.selectNodeContents(el);
-    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    var range = document.createRange();
+    range.selectNodeContents(el);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
   }, true);
 
   function commitText() {
@@ -319,6 +469,23 @@
     if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); send({ type: e.shiftKey ? 'redo' : 'undo' }); }
     if (e.key === 's' && !e.metaKey && !e.ctrlKey && !textEdit) { e.preventDefault(); toggleStylePanel(); }
     if (e.key === 'Delete' && state.selected) hideSelectedEl();
+    if (state.selected && !textEdit && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key) >= 0) {
+      e.preventDefault();
+      var amount = e.shiftKey ? 10 : 1; // Shift = 10px steps
+      var prop, dir;
+      if (e.key === 'ArrowUp') { prop = 'marginTop'; dir = -1; }
+      else if (e.key === 'ArrowDown') { prop = 'marginTop'; dir = 1; }
+      else if (e.key === 'ArrowLeft') { prop = 'marginLeft'; dir = -1; }
+      else if (e.key === 'ArrowRight') { prop = 'marginLeft'; dir = 1; }
+
+      var cs = getComputedStyle(state.selected);
+      var cur = parseInt(cs[prop]) || 0;
+      var newVal = (cur + dir * amount) + 'px';
+      var oldVal = cs[prop];
+      state.selected.style[prop] = newVal;
+      syncSel();
+      sendChange({ type: 'style', element: desc(state.selected), selector: cssPath(state.selected), changes: { [prop]: { from: oldVal, to: newVal } }, url: location.pathname });
+    }
   }, true);
 
   // ── Floating Toolbar ─────────────────────────────────────

@@ -257,3 +257,49 @@
   background: #3b82f6; border-radius: 2px; margin: 2px 0;
   transition: all 0.15s ease; pointer-events: none;
 }
+
+/* ── Spacing Guides (Figma-like) ────────────────────── */
+
+.moldui-guides {
+  display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  pointer-events: none; z-index: 3;
+}
+.moldui-guide-line {
+  background: #f43f5e; pointer-events: none;
+}
+.moldui-guide-label {
+  background: #f43f5e; color: #fff;
+  font: 500 9px/1 monospace; padding: 2px 5px; border-radius: 3px;
+  pointer-events: none; white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(244,63,94,0.3);
+}
+
+/* ── Drop Target Highlight ──────────────────────────── */
+
+.moldui-drop-target {
+  outline: 2px dashed #3b82f6 !important;
+  outline-offset: 2px;
+}
+
+/* ── Editing Active State ───────────────────────────── */
+
+[contenteditable="true"] {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 1px;
+  cursor: text !important;
+  min-width: 20px;
+  min-height: 1em;
+}
+
+/* ── Enhanced Selection ─────────────────────────────── */
+
+.moldui-selection-box {
+  box-shadow: 0 0 0 1px rgba(59,130,246,0.3);
+}
+
+/* ── Toolbar separator ──────────────────────────────── */
+
+.moldui-toolbar-sep {
+  width: 1px; height: 20px; background: rgba(255,255,255,0.1);
+  margin: 0 2px;
+}
