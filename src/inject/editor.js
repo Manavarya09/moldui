@@ -1,0 +1,601 @@
+(function() {
+  'use strict';
+  if (window.__CLAYUI_ACTIVE__) return;
+  window.__CLAYUI_ACTIVE__ = true;
+
+  // ── Shadow DOM Host ──────────────────────────────────────
+  var host = document.createElement('div');
+  host.id = '__clayui-host__';
+  host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;pointer-events:none;';
+  document.body.appendChild(host);
+  var shadow = host.attachShadow({ mode: 'open' });
+
+  var link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = '/__clayui__/editor.css';
+  shadow.appendChild(link);
+
+  var overlay = document.createElement('div');
+  overlay.className = 'clayui-overlay';
+  shadow.appendChild(overlay);
+
+  // ── State ────────────────────────────────────────────────
+  var state = { selected: null, hovered: null, mode: 'select', wsConnected: false };
+
+  // ── WebSocket ────────────────────────────────────────────
+  var wsPort = window.__CLAYUI_WS_PORT__ || 4445;
+  var ws;
+
+  function connectWS() {
+    try {
+      ws = new WebSocket('ws://localhost:' + wsPort);
+      ws.onopen = function() { state.wsConnected = true; updateStatusBar(); };
+      ws.onclose = function() { state.wsConnected = false; updateStatusBar(); setTimeout(connectWS, 2000); };
+      ws.onmessage = function(e) { try { handleServerMsg(JSON.parse(e.data)); } catch(x) {} };
+    } catch(x) { setTimeout(connectWS, 2000); }
+  }
+  connectWS();
+
+  function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+  function sendChange(c) { send({ type: 'change', payload: c }); }
+
+  function handleServerMsg(msg) {
+    if (msg.type === 'synced') showShimmer('synced', 'Synced to ' + (msg.payload.file || 'source'));
+    else if (msg.type === 'status' && msg.payload.state === 'writing') showShimmer('working', msg.payload.file ? 'Rewriting ' + msg.payload.file + '...' : 'AI is rewriting...');
+    else if (msg.type === 'status' && msg.payload.state === 'idle') hideShimmer();
+    else if (msg.type === 'error') showShimmer('error', msg.payload.message || 'Error');
+  }
+
+  // ── Helpers ──────────────────────────────────────────────
+  function isEditor(el) { return el && (el === host || host.contains(el) || el.id === '__clayui-host__'); }
+
+  function elLabel(el) {
+    var s = el.tagName.toLowerCase();
+    if (el.id) s += '#' + el.id;
+    var cls = Array.from(el.classList).filter(Boolean).slice(0, 2);
+    if (cls.length) s += '.' + cls.join('.');
+    return s;
+  }
+
+  function desc(el) {
+    var r = el.getBoundingClientRect();
+    return {
+      tag: el.tagName.toLowerCase(), id: el.id || null,
+      classes: Array.from(el.classList).filter(Boolean),
+      textContent: (el.textContent || '').trim().slice(0, 100),
+      selector: cssPath(el),
+      rect: { x: r.x, y: r.y, width: r.width, height: r.height }
+    };
+  }
+
+  function cssPath(el) {
+    var parts = [], cur = el;
+    while (cur && cur !== document.body && parts.length < 5) {
+      var s = cur.tagName.toLowerCase();
+      if (cur.id) { parts.unshift(s + '#' + cur.id); break; }
+      var p = cur.parentElement;
+      if (p) {
+        var sibs = Array.from(p.children).filter(function(c) { return c.tagName === cur.tagName; });
+        if (sibs.length > 1) s += ':nth-of-type(' + (sibs.indexOf(cur) + 1) + ')';
+      }
+      parts.unshift(s);
+      cur = cur.parentElement;
+    }
+    return parts.join(' > ');
+  }
+
+  function rgb2hex(rgb) {
+    if (!rgb || rgb === 'transparent' || rgb.startsWith('#')) return rgb || '#000000';
+    var m = rgb.match(/(\d+)/g);
+    if (!m || m.length < 3) return '#000000';
+    return '#' + m.slice(0, 3).map(function(v) { return Number(v).toString(16).padStart(2, '0'); }).join('');
+  }
+
+  function mk(tag, cls, parent) {
+    var el = document.createElement(tag);
+    el.className = cls;
+    if (parent) parent.appendChild(el);
+    return el;
+  }
+
+  // ── Selection Layer ──────────────────────────────────────
+  var selBox = mk('div', 'clayui-selection-box', overlay);
+  var hovBox = mk('div', 'clayui-hover-box', overlay);
+  var hovLabel = mk('div', 'clayui-hover-label', overlay);
+  var handleWrap = mk('div', 'clayui-handles', overlay);
+  var handles = {};
+  ['nw','n','ne','e','se','s','sw','w'].forEach(function(pos) {
+    var h = mk('div', 'clayui-handle clayui-handle-' + pos, handleWrap);
+    h.dataset.pos = pos;
+    h.style.pointerEvents = 'auto';
+    handles[pos] = h;
+  });
+
+  function posBox(box, r) {
+    box.style.cssText = 'display:block;position:fixed;top:' + r.top + 'px;left:' + r.left + 'px;width:' + r.width + 'px;height:' + r.height + 'px;pointer-events:none;';
+  }
+
+  function selectEl(el) {
+    if (!el || isEditor(el)) return;
+    state.selected = el;
+    var r = el.getBoundingClientRect();
+    posBox(selBox, r);
+    handleWrap.style.cssText = 'display:block;position:fixed;top:' + r.top + 'px;left:' + r.left + 'px;width:' + r.width + 'px;height:' + r.height + 'px;';
+    showToolbar(el);
+    updateBreadcrumb(el);
+    if (stylePanelOpen) renderStylePanel(el);
+  }
+
+  function deselectEl() {
+    state.selected = null;
+    selBox.style.display = 'none';
+    handleWrap.style.display = 'none';
+    toolbar.style.display = 'none';
+    breadcrumb.style.display = 'none';
+    hideStylePanel();
+  }
+
+  function syncSel() {
+    if (!state.selected) return;
+    var r = state.selected.getBoundingClientRect();
+    posBox(selBox, r);
+    handleWrap.style.cssText = 'display:block;position:fixed;top:' + r.top + 'px;left:' + r.left + 'px;width:' + r.width + 'px;height:' + r.height + 'px;';
+    showToolbar(state.selected);
+  }
+  window.addEventListener('scroll', syncSel, true);
+  window.addEventListener('resize', syncSel);
+
+  // ── Hover + Click ────────────────────────────────────────
+  document.addEventListener('mousemove', function(e) {
+    if (state.mode !== 'select') return;
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || isEditor(el) || el === state.selected) { hovBox.style.display = 'none'; hovLabel.style.display = 'none'; return; }
+    var r = el.getBoundingClientRect();
+    posBox(hovBox, r);
+    hovLabel.style.cssText = 'display:block;position:fixed;top:' + (r.top - 22) + 'px;left:' + r.left + 'px;pointer-events:none;';
+    hovLabel.textContent = elLabel(el);
+  }, true);
+
+  document.addEventListener('click', function(e) {
+    if (state.mode !== 'select') return;
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    if (isEditor(el)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (el) selectEl(el); else deselectEl();
+  }, true);
+
+  document.addEventListener('click', function(e) { if (state.selected && e.target.closest('a')) e.preventDefault(); }, true);
+
+  // ── Drag Engine ──────────────────────────────────────────
+  var dragSt = null;
+
+  function startDrag(el, x, y) {
+    var r = el.getBoundingClientRect();
+    var parent = el.parentElement;
+    var sibs = parent ? Array.from(parent.children) : [];
+    var ghost = el.cloneNode(true);
+    ghost.style.cssText = 'position:fixed;top:' + r.top + 'px;left:' + r.left + 'px;width:' + r.width + 'px;height:' + r.height + 'px;opacity:0.6;pointer-events:none;z-index:2147483646;transition:none;';
+    document.body.appendChild(ghost);
+    var ph = document.createElement('div');
+    ph.style.cssText = 'width:' + r.width + 'px;height:4px;background:#3b82f6;border-radius:2px;margin:2px 0;transition:all 0.15s;';
+    dragSt = { el: el, x: x, y: y, r: r, parent: parent, sibs: sibs, startIdx: sibs.indexOf(el), ghost: ghost, ph: ph };
+    el.style.opacity = '0.3';
+    state.mode = 'drag';
+  }
+
+  function onDrag(e) {
+    if (!dragSt) return;
+    dragSt.ghost.style.top = (dragSt.r.top + e.clientY - dragSt.y) + 'px';
+    dragSt.ghost.style.left = (dragSt.r.left + e.clientX - dragSt.x) + 'px';
+    if (!dragSt.parent) return;
+    var before = null;
+    dragSt.sibs.forEach(function(s) {
+      if (s === dragSt.el || before) return;
+      var sr = s.getBoundingClientRect();
+      if (e.clientY < sr.top + sr.height / 2) before = s;
+    });
+    if (dragSt.ph.parentElement) dragSt.ph.remove();
+    if (before) dragSt.parent.insertBefore(dragSt.ph, before);
+    else dragSt.parent.appendChild(dragSt.ph);
+  }
+
+  function endDrag() {
+    if (!dragSt) return;
+    var el = dragSt.el, ghost = dragSt.ghost, ph = dragSt.ph, parent = dragSt.parent, startIdx = dragSt.startIdx;
+    var newIdx = startIdx;
+    if (ph.parentElement) {
+      newIdx = Array.from(parent.children).indexOf(ph);
+      parent.insertBefore(el, ph);
+      ph.remove();
+    }
+    ghost.remove();
+    el.style.opacity = '';
+    if (newIdx !== startIdx) {
+      sendChange({ type: 'reorder', element: desc(el), selector: cssPath(el), fromIndex: startIdx, toIndex: newIdx, siblingCount: dragSt.sibs.length, url: location.pathname });
+    }
+    dragSt = null; state.mode = 'select'; selectEl(el);
+  }
+
+  // ── Resize Engine ────────────────────────────────────────
+  var rszSt = null;
+
+  function startResize(el, pos, x, y) {
+    var cs = getComputedStyle(el);
+    rszSt = { el: el, pos: pos, x: x, y: y, w: parseFloat(cs.width), h: parseFloat(cs.height) };
+    state.mode = 'resize';
+    showDim(el);
+  }
+
+  function onResize(e) {
+    if (!rszSt) return;
+    var dx = e.clientX - rszSt.x, dy = e.clientY - rszSt.y;
+    var w = rszSt.w, h = rszSt.h;
+    if (rszSt.pos.indexOf('e') >= 0) w = rszSt.w + dx;
+    if (rszSt.pos.indexOf('w') >= 0) w = rszSt.w - dx;
+    if (rszSt.pos.indexOf('s') >= 0) h = rszSt.h + dy;
+    if (rszSt.pos.indexOf('n') >= 0) h = rszSt.h - dy;
+    w = Math.max(20, w); h = Math.max(20, h);
+    rszSt.el.style.width = w + 'px';
+    rszSt.el.style.height = h + 'px';
+    syncSel(); showDim(rszSt.el);
+  }
+
+  function endResize() {
+    if (!rszSt) return;
+    var cs = getComputedStyle(rszSt.el);
+    var nw = parseFloat(cs.width), nh = parseFloat(cs.height);
+    var changes = {};
+    if (nw !== rszSt.w) changes.width = { from: rszSt.w + 'px', to: nw + 'px' };
+    if (nh !== rszSt.h) changes.height = { from: rszSt.h + 'px', to: nh + 'px' };
+    if (Object.keys(changes).length) {
+      sendChange({ type: 'style', element: desc(rszSt.el), selector: cssPath(rszSt.el), changes: changes, url: location.pathname });
+    }
+    hideDim(); rszSt = null; state.mode = 'select';
+  }
+
+  Object.values(handles).forEach(function(h) {
+    h.addEventListener('mousedown', function(e) {
+      e.stopPropagation();
+      if (state.selected) startResize(state.selected, this.dataset.pos, e.clientX, e.clientY);
+    });
+  });
+
+  document.addEventListener('mousedown', function(e) {
+    if (state.selected && !isEditor(e.target) && e.target === state.selected && state.mode === 'select') {
+      e.preventDefault(); startDrag(state.selected, e.clientX, e.clientY);
+    }
+  }, true);
+
+  document.addEventListener('mousemove', function(e) {
+    if (dragSt) onDrag(e);
+    if (rszSt) onResize(e);
+  }, true);
+
+  document.addEventListener('mouseup', function() {
+    if (dragSt) endDrag();
+    if (rszSt) endResize();
+  }, true);
+
+  // ── Inline Text Editing ──────────────────────────────────
+  var textEdit = null;
+
+  document.addEventListener('dblclick', function(e) {
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || isEditor(el)) return;
+    var hasText = Array.from(el.childNodes).some(function(n) { return n.nodeType === 3 && n.textContent.trim(); });
+    if (!hasText) return;
+    e.preventDefault(); e.stopPropagation();
+    var old = el.textContent.trim();
+    el.contentEditable = 'true'; el.focus();
+    state.mode = 'text';
+    textEdit = { el: el, old: old };
+    var range = document.createRange(); range.selectNodeContents(el);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  }, true);
+
+  function commitText() {
+    if (!textEdit) return;
+    textEdit.el.contentEditable = 'false';
+    var nw = textEdit.el.textContent.trim();
+    if (nw !== textEdit.old) sendChange({ type: 'text', element: desc(textEdit.el), selector: cssPath(textEdit.el), oldText: textEdit.old, newText: nw, url: location.pathname });
+    textEdit = null; state.mode = 'select';
+  }
+
+  function cancelText() {
+    if (!textEdit) return;
+    textEdit.el.textContent = textEdit.old;
+    textEdit.el.contentEditable = 'false';
+    textEdit = null; state.mode = 'select';
+  }
+
+  // ── Keyboard Shortcuts ───────────────────────────────────
+  document.addEventListener('keydown', function(e) {
+    if (textEdit) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitText(); }
+      else if (e.key === 'Escape') cancelText();
+      return;
+    }
+    if (e.key === 'Escape') deselectEl();
+    if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); send({ type: e.shiftKey ? 'redo' : 'undo' }); }
+    if (e.key === 's' && !e.metaKey && !e.ctrlKey && !textEdit) { e.preventDefault(); toggleStylePanel(); }
+    if (e.key === 'Delete' && state.selected) hideSelectedEl();
+  }, true);
+
+  // ── Floating Toolbar ─────────────────────────────────────
+  var toolbar = mk('div', 'clayui-toolbar', overlay);
+  toolbar.style.pointerEvents = 'auto';
+  var tbBtns = [
+    { a: 'text', label: 'Edit Text' },
+    { a: 'style', label: 'Style' },
+    { a: 'dup', label: 'Duplicate' },
+    { a: 'hide', label: 'Hide' }
+  ];
+  tbBtns.forEach(function(b) {
+    var btn = document.createElement('button');
+    btn.dataset.a = b.a;
+    btn.textContent = b.label;
+    toolbar.appendChild(btn);
+  });
+
+  toolbar.addEventListener('click', function(e) {
+    var btn = e.target.closest('button');
+    if (!btn || !state.selected) return;
+    var a = btn.dataset.a;
+    if (a === 'style') toggleStylePanel();
+    if (a === 'dup') dupSelectedEl();
+    if (a === 'hide') hideSelectedEl();
+    if (a === 'text') {
+      var r = state.selected.getBoundingClientRect();
+      state.selected.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: r.x + 5, clientY: r.y + 5 }));
+    }
+  });
+
+  function showToolbar(el) {
+    var r = el.getBoundingClientRect();
+    var t = r.top - 42;
+    toolbar.style.cssText = 'display:flex;position:fixed;top:' + (t < 5 ? r.bottom + 5 : t) + 'px;left:' + r.left + 'px;pointer-events:auto;';
+  }
+
+  function dupSelectedEl() {
+    if (!state.selected) return;
+    var clone = state.selected.cloneNode(true);
+    state.selected.parentElement.insertBefore(clone, state.selected.nextSibling);
+    sendChange({ type: 'clone', element: desc(state.selected), selector: cssPath(state.selected), index: Array.from(state.selected.parentElement.children).indexOf(clone), url: location.pathname });
+    selectEl(clone);
+  }
+
+  function hideSelectedEl() {
+    if (!state.selected) return;
+    var old = getComputedStyle(state.selected).display;
+    state.selected.style.display = 'none';
+    sendChange({ type: 'style', element: desc(state.selected), selector: cssPath(state.selected), changes: { display: { from: old, to: 'none' } }, url: location.pathname });
+    deselectEl();
+  }
+
+  // ── Style Panel ──────────────────────────────────────────
+  var stylePanel = mk('div', 'clayui-style-panel', overlay);
+  stylePanel.style.pointerEvents = 'auto';
+  var stylePanelOpen = false;
+
+  function toggleStylePanel() {
+    stylePanelOpen = !stylePanelOpen;
+    if (stylePanelOpen && state.selected) { renderStylePanel(state.selected); stylePanel.style.display = 'block'; }
+    else hideStylePanel();
+  }
+  function hideStylePanel() { stylePanelOpen = false; stylePanel.style.display = 'none'; }
+
+  function renderStylePanel(el) {
+    var cs = getComputedStyle(el);
+    var isFlex = cs.display === 'flex' || cs.display === 'inline-flex';
+
+    // Build panel using DOM methods (safe, no innerHTML with user content)
+    while (stylePanel.firstChild) stylePanel.removeChild(stylePanel.firstChild);
+
+    // Header
+    var header = mk('div', 'clayui-sp-header', stylePanel);
+    var title = mk('span', 'clayui-sp-title', header);
+    title.textContent = elLabel(el);
+    var closeBtn = mk('button', 'clayui-sp-close', header);
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', hideStylePanel);
+
+    // Build sections
+    buildSection(stylePanel, 'Layout', [
+      { label: 'Display', type: 'select', prop: 'display', opts: ['block','flex','grid','inline-flex','inline-block','inline','none'], val: cs.display },
+      isFlex && { label: 'Direction', type: 'select', prop: 'flexDirection', opts: ['row','column','row-reverse','column-reverse'], val: cs.flexDirection },
+      isFlex && { label: 'Justify', type: 'select', prop: 'justifyContent', opts: ['flex-start','center','flex-end','space-between','space-around','space-evenly'], val: cs.justifyContent },
+      isFlex && { label: 'Align', type: 'select', prop: 'alignItems', opts: ['stretch','flex-start','center','flex-end','baseline'], val: cs.alignItems },
+      isFlex && { label: 'Gap', type: 'text', prop: 'gap', val: cs.gap }
+    ].filter(Boolean));
+
+    buildSection(stylePanel, 'Size', [
+      { label: 'Width', type: 'text', prop: 'width', val: cs.width },
+      { label: 'Height', type: 'text', prop: 'height', val: cs.height }
+    ]);
+
+    buildSection(stylePanel, 'Spacing', [
+      { label: 'Pad Top', type: 'text', prop: 'paddingTop', val: cs.paddingTop },
+      { label: 'Pad Right', type: 'text', prop: 'paddingRight', val: cs.paddingRight },
+      { label: 'Pad Bottom', type: 'text', prop: 'paddingBottom', val: cs.paddingBottom },
+      { label: 'Pad Left', type: 'text', prop: 'paddingLeft', val: cs.paddingLeft },
+      { label: 'Margin Top', type: 'text', prop: 'marginTop', val: cs.marginTop },
+      { label: 'Margin Right', type: 'text', prop: 'marginRight', val: cs.marginRight },
+      { label: 'Margin Bottom', type: 'text', prop: 'marginBottom', val: cs.marginBottom },
+      { label: 'Margin Left', type: 'text', prop: 'marginLeft', val: cs.marginLeft }
+    ]);
+
+    buildSection(stylePanel, 'Typography', [
+      { label: 'Font', type: 'text', prop: 'fontFamily', val: cs.fontFamily.split(',')[0].replace(/['"]/g, '') },
+      { label: 'Size', type: 'text', prop: 'fontSize', val: cs.fontSize },
+      { label: 'Weight', type: 'select', prop: 'fontWeight', opts: ['100','200','300','400','500','600','700','800','900'], val: cs.fontWeight },
+      { label: 'Color', type: 'color', prop: 'color', val: cs.color },
+      { label: 'Line H.', type: 'text', prop: 'lineHeight', val: cs.lineHeight }
+    ]);
+
+    buildSection(stylePanel, 'Background', [
+      { label: 'Color', type: 'color', prop: 'backgroundColor', val: cs.backgroundColor }
+    ]);
+
+    buildSection(stylePanel, 'Border', [
+      { label: 'Radius', type: 'text', prop: 'borderRadius', val: cs.borderRadius },
+      { label: 'Color', type: 'color', prop: 'borderColor', val: cs.borderColor },
+      { label: 'Width', type: 'text', prop: 'borderWidth', val: cs.borderWidth }
+    ]);
+
+    buildSection(stylePanel, 'Shadow', [
+      { label: 'Box', type: 'text', prop: 'boxShadow', val: cs.boxShadow === 'none' ? '' : cs.boxShadow }
+    ]);
+
+    buildSection(stylePanel, 'Effects', [
+      { label: 'Opacity', type: 'range', prop: 'opacity', val: cs.opacity, min: 0, max: 1, step: 0.05 }
+    ]);
+  }
+
+  function buildSection(parent, title, fields) {
+    var sec = mk('div', 'clayui-sp-section', parent);
+    var t = mk('div', 'clayui-sp-section-title', sec);
+    t.textContent = title;
+    fields.forEach(function(f) { buildField(sec, f); });
+  }
+
+  function buildField(parent, f) {
+    var row = mk('div', 'clayui-sp-row', parent);
+    var lbl = document.createElement('label');
+    lbl.textContent = f.label;
+    row.appendChild(lbl);
+
+    var input;
+    if (f.type === 'select') {
+      input = document.createElement('select');
+      input.dataset.prop = f.prop;
+      f.opts.forEach(function(o) {
+        var opt = document.createElement('option');
+        opt.value = o; opt.textContent = o;
+        if (f.val === o) opt.selected = true;
+        input.appendChild(opt);
+      });
+    } else if (f.type === 'color') {
+      var wrap = mk('div', 'clayui-sp-color-row', row);
+      var cInput = document.createElement('input');
+      cInput.type = 'color'; cInput.dataset.prop = f.prop; cInput.value = rgb2hex(f.val);
+      var tInput = document.createElement('input');
+      tInput.type = 'text'; tInput.dataset.prop = f.prop; tInput.value = f.val || '';
+      wrap.appendChild(cInput);
+      wrap.appendChild(tInput);
+      wireInput(cInput, f.prop);
+      wireInput(tInput, f.prop);
+      cInput.addEventListener('input', function() { tInput.value = cInput.value; });
+      return;
+    } else if (f.type === 'range') {
+      input = document.createElement('input');
+      input.type = 'range'; input.dataset.prop = f.prop;
+      input.min = f.min; input.max = f.max; input.step = f.step; input.value = f.val;
+      var valSpan = mk('span', 'clayui-sp-range-val', row);
+      valSpan.textContent = f.val;
+      input.addEventListener('input', function() { valSpan.textContent = input.value; });
+    } else {
+      input = document.createElement('input');
+      input.type = 'text'; input.dataset.prop = f.prop; input.value = f.val || '';
+    }
+
+    if (input) {
+      row.appendChild(input);
+      wireInput(input, f.prop);
+    }
+  }
+
+  function wireInput(input, prop) {
+    var handler = function() {
+      if (!state.selected) return;
+      var old = getComputedStyle(state.selected)[prop];
+      var val = input.value;
+      if (/^(margin|padding)/.test(prop) && val && !/[a-z%]/.test(val)) val += 'px';
+      state.selected.style[prop] = val;
+      syncSel();
+      sendChange({ type: 'style', element: desc(state.selected), selector: cssPath(state.selected), changes: { [prop]: { from: old, to: val } }, url: location.pathname });
+    };
+    if (input.type === 'range' || input.type === 'color') input.addEventListener('input', handler);
+    else if (input.tagName === 'SELECT') input.addEventListener('change', handler);
+    else { input.addEventListener('change', handler); input.addEventListener('keydown', function(e) { if (e.key === 'Enter') handler(); }); }
+  }
+
+  // ── Viewport Bar ─────────────────────────────────────────
+  var vpBar = mk('div', 'clayui-viewport-bar', overlay);
+  vpBar.style.pointerEvents = 'auto';
+  [{ vp: '375', label: '375' }, { vp: '768', label: '768' }, { vp: '1024', label: '1024' }, { vp: '1280', label: '1280' }, { vp: 'full', label: 'Full' }].forEach(function(v) {
+    var btn = document.createElement('button');
+    btn.dataset.vp = v.vp;
+    btn.textContent = v.label;
+    if (v.vp === 'full') btn.classList.add('active');
+    vpBar.appendChild(btn);
+  });
+
+  vpBar.addEventListener('click', function(e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    vpBar.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    var vp = btn.dataset.vp;
+    if (vp === 'full') { document.documentElement.style.maxWidth = ''; document.documentElement.style.margin = ''; document.documentElement.style.boxShadow = ''; }
+    else { document.documentElement.style.maxWidth = vp + 'px'; document.documentElement.style.margin = '0 auto'; document.documentElement.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.1)'; }
+  });
+
+  // ── Breadcrumb ───────────────────────────────────────────
+  var breadcrumb = mk('div', 'clayui-breadcrumb', overlay);
+  breadcrumb.style.pointerEvents = 'auto';
+
+  function updateBreadcrumb(el) {
+    var parts = [], cur = el;
+    while (cur && cur !== document.documentElement && parts.length < 6) { parts.unshift(cur); cur = cur.parentElement; }
+    while (breadcrumb.firstChild) breadcrumb.removeChild(breadcrumb.firstChild);
+    parts.forEach(function(p, i) {
+      if (i > 0) {
+        var sep = mk('span', 'clayui-bc-sep', breadcrumb);
+        sep.textContent = '\u203a';
+      }
+      var item = mk('span', 'clayui-bc-item' + (i === parts.length - 1 ? ' active' : ''), breadcrumb);
+      item.textContent = elLabel(p);
+      item.addEventListener('click', function() { selectEl(p); });
+    });
+    breadcrumb.style.display = 'flex';
+  }
+
+  // ── Shimmer Bar ──────────────────────────────────────────
+  var shimmer = mk('div', 'clayui-shimmer', overlay);
+  var shimmerText = mk('div', 'clayui-shimmer-text', shimmer);
+
+  function showShimmer(s, text) {
+    shimmer.className = 'clayui-shimmer clayui-shimmer-' + s;
+    shimmerText.textContent = text || '';
+    shimmer.style.display = 'flex';
+    if (s === 'synced') setTimeout(function() { shimmer.style.display = 'none'; }, 2500);
+  }
+  function hideShimmer() { shimmer.style.display = 'none'; }
+
+  // ── Status Bar ───────────────────────────────────────────
+  var statusBar = mk('div', 'clayui-status-bar', overlay);
+  statusBar.style.pointerEvents = 'auto';
+  function updateStatusBar() {
+    while (statusBar.firstChild) statusBar.removeChild(statusBar.firstChild);
+    statusBar.appendChild(document.createTextNode(state.wsConnected ? '\u{1F7E2} ' : '\u{1F534} '));
+    var items = ['clayui', 'S styles', 'Dbl-click text', 'Esc deselect', 'Cmd+Z undo'];
+    items.forEach(function(t, i) {
+      if (i > 0) statusBar.appendChild(document.createTextNode(' \u00b7 '));
+      var span = document.createElement('span');
+      span.textContent = t;
+      statusBar.appendChild(span);
+    });
+  }
+  updateStatusBar();
+
+  // ── Dimensions Label ─────────────────────────────────────
+  var dimLabel = mk('div', 'clayui-dim-label', overlay);
+  function showDim(el) {
+    var r = el.getBoundingClientRect();
+    dimLabel.textContent = Math.round(r.width) + ' \u00d7 ' + Math.round(r.height);
+    dimLabel.style.cssText = 'display:block;position:fixed;top:' + (r.bottom + 5) + 'px;left:' + (r.left + r.width / 2) + 'px;transform:translateX(-50%);';
+  }
+  function hideDim() { dimLabel.style.display = 'none'; }
+
+  console.log('[clayui] Editor loaded. Click to select, drag to move, double-click to edit text, S for styles.');
+})();

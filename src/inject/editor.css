@@ -1,0 +1,259 @@
+/* clayui editor overlay — injected into shadow DOM */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.clayui-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  pointer-events: none; z-index: 2147483646;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── Selection & Hover ──────────────────────────────── */
+
+.clayui-selection-box {
+  display: none; border: 2px solid #3b82f6; border-radius: 2px;
+  pointer-events: none; transition: all 0.08s ease-out;
+}
+.clayui-hover-box {
+  display: none; border: 1px dashed rgba(59,130,246,0.5); border-radius: 2px;
+  pointer-events: none; transition: all 0.05s ease-out;
+}
+.clayui-hover-label {
+  display: none; background: #3b82f6; color: #fff; font: 500 10px/1 monospace;
+  padding: 2px 6px; border-radius: 3px; white-space: nowrap; pointer-events: none;
+}
+
+/* ── Resize Handles ─────────────────────────────────── */
+
+.clayui-handles { display: none; pointer-events: none; }
+.clayui-handle {
+  position: absolute; width: 8px; height: 8px;
+  background: #fff; border: 2px solid #3b82f6; border-radius: 2px;
+  pointer-events: auto; cursor: pointer; transition: transform 0.1s;
+}
+.clayui-handle:hover { transform: scale(1.3); }
+.clayui-handle-nw { top: -5px; left: -5px; cursor: nw-resize; }
+.clayui-handle-n  { top: -5px; left: calc(50% - 4px); cursor: n-resize; }
+.clayui-handle-ne { top: -5px; right: -5px; cursor: ne-resize; }
+.clayui-handle-e  { top: calc(50% - 4px); right: -5px; cursor: e-resize; }
+.clayui-handle-se { bottom: -5px; right: -5px; cursor: se-resize; }
+.clayui-handle-s  { bottom: -5px; left: calc(50% - 4px); cursor: s-resize; }
+.clayui-handle-sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+.clayui-handle-w  { top: calc(50% - 4px); left: -5px; cursor: w-resize; }
+
+/* ── Floating Toolbar ───────────────────────────────── */
+
+.clayui-toolbar {
+  display: none; position: fixed;
+  background: rgba(10,10,15,0.92); backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  padding: 4px; gap: 2px; z-index: 4;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+.clayui-toolbar button {
+  background: transparent; color: #d1d5db; border: none;
+  padding: 7px 11px; border-radius: 7px; font: 500 11px/1 system-ui;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.clayui-toolbar button:hover { background: rgba(59,130,246,0.25); color: #fff; }
+
+/* ── Style Panel ────────────────────────────────────── */
+
+.clayui-style-panel {
+  display: none; position: fixed; top: 0; right: 0; width: 280px; height: 100vh;
+  background: rgba(10,10,15,0.96); backdrop-filter: blur(20px);
+  border-left: 1px solid rgba(255,255,255,0.08);
+  overflow-y: auto; color: #d1d5db; font: 12px/1.5 system-ui; z-index: 5;
+  scrollbar-width: thin; scrollbar-color: #333 transparent;
+}
+.clayui-style-panel::-webkit-scrollbar { width: 5px; }
+.clayui-style-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+.clayui-sp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  position: sticky; top: 0; background: rgba(10,10,15,0.98); z-index: 1;
+}
+.clayui-sp-title { font: 600 12px/1 system-ui; color: #f3f4f6; }
+.clayui-sp-close {
+  background: none; border: none; color: #6b7280; font-size: 18px;
+  cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.clayui-sp-close:hover { color: #fff; }
+
+.clayui-sp-section { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.clayui-sp-section-title {
+  font: 600 10px/1 system-ui; color: #6b7280; text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 8px;
+}
+
+.clayui-sp-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.clayui-sp-row label {
+  flex: 0 0 60px; font: 11px/1 system-ui; color: #9ca3af; text-align: right;
+}
+
+.clayui-sp-row input[type="text"],
+.clayui-sp-row input[type="number"] {
+  flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px; padding: 5px 8px; color: #e5e7eb; font: 11px/1 monospace;
+  outline: none; transition: border-color 0.15s;
+}
+.clayui-sp-row input:focus { border-color: #3b82f6; }
+
+.clayui-sp-row select {
+  flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px; padding: 5px 6px; color: #e5e7eb; font: 11px/1 system-ui;
+  outline: none; cursor: pointer;
+}
+.clayui-sp-row select:focus { border-color: #3b82f6; }
+
+.clayui-sp-row input[type="range"] {
+  flex: 1; accent-color: #3b82f6; height: 4px;
+}
+.clayui-sp-range-val { font: 11px/1 monospace; color: #9ca3af; min-width: 30px; }
+
+.clayui-sp-color-row { display: flex; align-items: center; gap: 6px; flex: 1; }
+.clayui-sp-color-row input[type="color"] {
+  width: 28px; height: 28px; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px; cursor: pointer; padding: 1px; background: transparent;
+}
+.clayui-sp-color-row input[type="text"] {
+  flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px; padding: 5px 8px; color: #e5e7eb; font: 11px/1 monospace; outline: none;
+}
+
+/* Spacing box model */
+.clayui-sp-spacing-box {
+  position: relative; background: rgba(59,130,246,0.08);
+  border: 1px dashed rgba(59,130,246,0.3); border-radius: 6px;
+  padding: 22px 28px; margin: 4px 0;
+}
+.clayui-sp-padding-box {
+  position: relative; background: rgba(16,185,129,0.08);
+  border: 1px dashed rgba(16,185,129,0.3); border-radius: 4px;
+  padding: 18px 24px;
+}
+.clayui-sp-content-box {
+  background: rgba(255,255,255,0.05); border-radius: 3px;
+  padding: 8px; text-align: center; font: 10px/1 monospace; color: #6b7280;
+}
+.clayui-sp-spacing-label {
+  position: absolute; top: 2px; left: 6px; font: 9px/1 system-ui;
+  color: #6b7280; text-transform: uppercase;
+}
+.clayui-sp-spacing-input {
+  position: absolute; width: 28px; text-align: center;
+  background: transparent; border: none; color: #d1d5db;
+  font: 11px/1 monospace; outline: none; cursor: text;
+}
+.clayui-sp-spacing-input:focus { color: #3b82f6; }
+.clayui-sp-spacing-input.top { top: 4px; left: calc(50% - 14px); }
+.clayui-sp-spacing-input.right { top: calc(50% - 6px); right: 4px; }
+.clayui-sp-spacing-input.bottom { bottom: 4px; left: calc(50% - 14px); }
+.clayui-sp-spacing-input.left { top: calc(50% - 6px); left: 4px; }
+
+/* ── Viewport Bar ───────────────────────────────────── */
+
+.clayui-viewport-bar {
+  position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 2px;
+  background: rgba(10,10,15,0.92); backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  padding: 4px; z-index: 4;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  pointer-events: auto;
+}
+.clayui-viewport-bar button {
+  background: transparent; color: #6b7280; border: none;
+  padding: 6px 12px; border-radius: 7px; font: 500 11px/1 system-ui;
+  cursor: pointer; transition: all 0.15s;
+}
+.clayui-viewport-bar button:hover { color: #d1d5db; }
+.clayui-viewport-bar button.active { background: #3b82f6; color: #fff; }
+
+/* ── Breadcrumb ─────────────────────────────────────── */
+
+.clayui-breadcrumb {
+  display: none; position: fixed; bottom: 32px; left: 8px;
+  background: rgba(10,10,15,0.92); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+  padding: 6px 10px; font: 11px/1 monospace; color: #6b7280;
+  align-items: center; gap: 4px; z-index: 4;
+  pointer-events: auto; flex-wrap: wrap; max-width: calc(100vw - 300px);
+}
+.clayui-bc-item {
+  cursor: pointer; padding: 2px 5px; border-radius: 4px;
+  transition: all 0.12s; color: #9ca3af;
+}
+.clayui-bc-item:hover { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.clayui-bc-item.active { color: #3b82f6; font-weight: 600; }
+.clayui-bc-sep { color: #374151; font-size: 10px; }
+
+/* ── Shimmer Bar (AI Activity) ──────────────────────── */
+
+.clayui-shimmer {
+  display: none; position: fixed; bottom: 28px; left: 0; width: 100%;
+  height: 36px; align-items: center; justify-content: center; z-index: 6;
+  pointer-events: none;
+}
+.clayui-shimmer::before {
+  content: ''; position: absolute; inset: 0;
+  backdrop-filter: blur(8px);
+}
+.clayui-shimmer-working {
+  background: linear-gradient(90deg, #1e3a8a, #0e7490, #6d28d9, #1e3a8a);
+  background-size: 300% 100%;
+  animation: clayui-shimmer-move 2s linear infinite;
+}
+.clayui-shimmer-synced {
+  background: linear-gradient(90deg, #065f46, #059669, #34d399, #065f46);
+  background-size: 300% 100%;
+  animation: clayui-shimmer-move 0.8s linear forwards, clayui-shimmer-fade 0.5s 2s ease forwards;
+}
+.clayui-shimmer-error {
+  background: linear-gradient(90deg, #7f1d1d, #dc2626, #fca5a5, #7f1d1d);
+  background-size: 300% 100%;
+  animation: clayui-shimmer-move 1.5s linear infinite;
+}
+.clayui-shimmer-text {
+  position: relative; z-index: 1; color: #fff; font: 500 12px/1 system-ui;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4); letter-spacing: 0.01em;
+}
+
+@keyframes clayui-shimmer-move {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+@keyframes clayui-shimmer-fade {
+  to { opacity: 0; }
+}
+
+/* ── Status Bar ─────────────────────────────────────── */
+
+.clayui-status-bar {
+  position: fixed; bottom: 0; left: 0; width: 100%; height: 28px;
+  background: rgba(10,10,15,0.95); backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255,255,255,0.05);
+  color: #4b5563; font: 11px/28px system-ui; padding: 0 12px;
+  display: flex; align-items: center; gap: 6px; z-index: 4;
+  pointer-events: auto;
+}
+.clayui-status-bar span { color: #6b7280; }
+
+/* ── Dimensions Label ───────────────────────────────── */
+
+.clayui-dim-label {
+  display: none; background: #3b82f6; color: #fff;
+  font: 500 10px/1 monospace; padding: 3px 7px; border-radius: 4px;
+  z-index: 4; pointer-events: none; white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(59,130,246,0.3);
+}
+
+/* ── Drag Ghost ─────────────────────────────────────── */
+
+.clayui-drag-placeholder {
+  background: #3b82f6; border-radius: 2px; margin: 2px 0;
+  transition: all 0.15s ease; pointer-events: none;
+}

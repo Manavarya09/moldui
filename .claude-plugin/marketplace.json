@@ -1,0 +1,17 @@
+{
+  "name": "clayui",
+  "owner": {
+    "name": "masyv",
+    "url": "https://github.com/Manavarya09"
+  },
+  "plugins": [
+    {
+      "name": "clayui",
+      "source": "./",
+      "description": "Visual drag-and-drop editor overlay for any running web app. Drag, resize, edit text, change styles in the browser — Claude AI syncs changes to your source code.",
+      "version": "1.0.0",
+      "category": "design",
+      "tags": ["visual-editor", "drag-drop", "design", "ui", "canvas", "css"]
+    }
+  ]
+}
