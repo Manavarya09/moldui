@@ -301,5 +301,58 @@
 
 .moldui-toolbar-sep {
   width: 1px; height: 20px; background: rgba(255,255,255,0.1);
+}
+
+/* ── Action Bar (Undo / Redo / Save) ────────────────── */
+
+.moldui-action-bar {
+  position: fixed; top: 8px; right: 12px;
+  display: flex; align-items: center; gap: 3px;
+  background: rgba(10,10,15,0.92); backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  padding: 4px 6px; z-index: 4;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+  pointer-events: auto;
+}
+
+.moldui-ab-btn {
+  background: transparent; color: #d1d5db; border: none;
+  padding: 7px 12px; border-radius: 7px; font: 500 11px/1 system-ui;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.moldui-ab-btn:hover:not(:disabled) { background: rgba(59,130,246,0.2); color: #fff; }
+.moldui-ab-btn:disabled { cursor: default; }
+
+.moldui-ab-sep {
+  width: 1px; height: 20px; background: rgba(255,255,255,0.1);
+  margin: 0 3px;
+}
+
+.moldui-ab-save {
+  color: #9ca3af;
+}
+.moldui-ab-dirty {
+  background: #3b82f6 !important; color: #fff !important;
+  opacity: 1 !important;
+}
+.moldui-ab-dirty:hover { background: #2563eb !important; }
+.moldui-ab-saving {
+  background: rgba(59,130,246,0.3) !important; color: #93c5fd !important;
+  animation: moldui-pulse 1s ease infinite;
+}
+.moldui-ab-saved {
+  background: rgba(16,185,129,0.2) !important; color: #34d399 !important;
+}
+
+.moldui-ab-badge {
+  display: none; align-items: center; justify-content: center;
+  background: #ef4444; color: #fff; font: 600 9px/1 system-ui;
+  min-width: 16px; height: 16px; border-radius: 8px; padding: 0 4px;
+  margin-left: 2px;
+}
+
+@keyframes moldui-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
   margin: 0 2px;
 }

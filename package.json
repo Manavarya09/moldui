@@ -1,6 +1,6 @@
 {
   "name": "moldui",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Mold your UI. Visual drag-and-drop editor overlay for any running web app — powered by Claude AI.",
   "type": "module",
   "bin": {

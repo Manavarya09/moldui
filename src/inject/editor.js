@@ -22,6 +22,57 @@
   // ── State ────────────────────────────────────────────────
   var state = { selected: null, hovered: null, mode: 'select', wsConnected: false };
 
+  // ── Local Undo/Redo Stack ───────────────────────────────
+  var undoStack = [];
+  var redoStack = [];
+  var pendingChanges = [];
+  var saveState = 'idle'; // idle, dirty, saving, saved
+
+  function pushUndo(entry) {
+    // entry: { change, element, revert: function() }
+    undoStack.push(entry);
+    if (undoStack.length > 100) undoStack.shift();
+    redoStack = [];
+    pendingChanges.push(entry.change);
+    saveState = 'dirty';
+    updateActionBar();
+  }
+
+  function performUndo() {
+    var entry = undoStack.pop();
+    if (!entry) return;
+    entry.revert();
+    redoStack.push(entry);
+    // Remove from pending
+    var idx = pendingChanges.indexOf(entry.change);
+    if (idx >= 0) pendingChanges.splice(idx, 1);
+    send({ type: 'undo' });
+    saveState = pendingChanges.length > 0 ? 'dirty' : 'idle';
+    updateActionBar();
+    if (state.selected) syncSel();
+  }
+
+  function performRedo() {
+    var entry = redoStack.pop();
+    if (!entry) return;
+    // Re-apply the change
+    if (entry.apply) entry.apply();
+    undoStack.push(entry);
+    pendingChanges.push(entry.change);
+    send({ type: 'redo' });
+    saveState = 'dirty';
+    updateActionBar();
+    if (state.selected) syncSel();
+  }
+
+  function performSave() {
+    if (pendingChanges.length === 0) return;
+    var batch = pendingChanges.splice(0);
+    send({ type: 'batch', payload: batch });
+    saveState = 'saving';
+    updateActionBar();
+  }
+
   // Prevent all form submissions and link navigations while editor is active
   document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
 
@@ -40,13 +91,31 @@
   connectWS();
 
   function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
-  function sendChange(c) { send({ type: 'change', payload: c }); }
+
+  // sendChange now goes through the undo stack — callers must provide a revert function
+  function sendChangeWithUndo(change, revertFn, applyFn) {
+    pushUndo({ change: change, revert: revertFn, apply: applyFn || function() {} });
+    send({ type: 'change', payload: change });
+  }
+
+  // Legacy sendChange for cases where undo isn't practical
+  function sendChange(c) {
+    pendingChanges.push(c);
+    saveState = 'dirty';
+    updateActionBar();
+    send({ type: 'change', payload: c });
+  }
 
   function handleServerMsg(msg) {
-    if (msg.type === 'synced') showShimmer('synced', 'Synced to ' + (msg.payload.file || 'source'));
-    else if (msg.type === 'status' && msg.payload.state === 'writing') showShimmer('working', msg.payload.file ? 'Rewriting ' + msg.payload.file + '...' : 'AI is rewriting...');
+    if (msg.type === 'synced') {
+      showShimmer('synced', 'Saved to ' + (msg.payload.file || 'source'));
+      saveState = 'saved';
+      updateActionBar();
+      setTimeout(function() { if (saveState === 'saved') { saveState = 'idle'; updateActionBar(); } }, 3000);
+    }
+    else if (msg.type === 'status' && msg.payload.state === 'writing') { showShimmer('working', msg.payload.file ? 'Rewriting ' + msg.payload.file + '...' : 'AI is writing code...'); saveState = 'saving'; updateActionBar(); }
     else if (msg.type === 'status' && msg.payload.state === 'idle') hideShimmer();
-    else if (msg.type === 'error') showShimmer('error', msg.payload.message || 'Error');
+    else if (msg.type === 'error') { showShimmer('error', msg.payload.message || 'Error'); saveState = 'dirty'; updateActionBar(); }
   }
 
   // ── Helpers ──────────────────────────────────────────────
@@ -325,12 +394,19 @@
 
     var moved = (targetContainer !== parent) || (newIdx !== startIdx);
     if (moved) {
-      sendChange({
+      var change = {
         type: 'reorder', element: desc(el), selector: cssPath(el),
         fromIndex: startIdx, toIndex: newIdx,
         fromParent: cssPath(parent), toParent: cssPath(targetContainer),
         siblingCount: Array.from(targetContainer.children).length,
         url: location.pathname
+      };
+      var savedParent = parent, savedIdx = startIdx, savedEl = el;
+      sendChangeWithUndo(change, function() {
+        // Revert: move element back to original parent at original index
+        var children = Array.from(savedParent.children);
+        if (savedIdx >= children.length) savedParent.appendChild(savedEl);
+        else savedParent.insertBefore(savedEl, children[savedIdx]);
       });
     }
     dragSt = null; state.mode = 'select'; selectEl(el);
@@ -378,7 +454,15 @@
     if (nw !== rszSt.w) changes.width = { from: rszSt.w + 'px', to: nw + 'px' };
     if (nh !== rszSt.h) changes.height = { from: rszSt.h + 'px', to: nh + 'px' };
     if (Object.keys(changes).length) {
-      sendChange({ type: 'style', element: desc(rszSt.el), selector: cssPath(rszSt.el), changes: changes, url: location.pathname });
+      var change = { type: 'style', element: desc(rszSt.el), selector: cssPath(rszSt.el), changes: changes, url: location.pathname };
+      var savedEl = rszSt.el, savedW = rszSt.w, savedH = rszSt.h, finalW = nw, finalH = nh;
+      sendChangeWithUndo(change, function() {
+        savedEl.style.width = savedW + 'px';
+        savedEl.style.height = savedH + 'px';
+      }, function() {
+        savedEl.style.width = finalW + 'px';
+        savedEl.style.height = finalH + 'px';
+      });
     }
     hideDim(); rszSt = null; state.mode = 'select';
   }
@@ -447,7 +531,11 @@
     if (!textEdit) return;
     textEdit.el.contentEditable = 'false';
     var nw = textEdit.el.textContent.trim();
-    if (nw !== textEdit.old) sendChange({ type: 'text', element: desc(textEdit.el), selector: cssPath(textEdit.el), oldText: textEdit.old, newText: nw, url: location.pathname });
+    if (nw !== textEdit.old) {
+      var change = { type: 'text', element: desc(textEdit.el), selector: cssPath(textEdit.el), oldText: textEdit.old, newText: nw, url: location.pathname };
+      var savedEl = textEdit.el, savedOld = textEdit.old, savedNew = nw;
+      sendChangeWithUndo(change, function() { savedEl.textContent = savedOld; }, function() { savedEl.textContent = savedNew; });
+    }
     textEdit = null; state.mode = 'select';
   }
 
@@ -466,7 +554,7 @@
       return;
     }
     if (e.key === 'Escape') deselectEl();
-    if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); send({ type: e.shiftKey ? 'redo' : 'undo' }); }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); if (e.shiftKey) performRedo(); else performUndo(); }
     if (e.key === 's' && !e.metaKey && !e.ctrlKey && !textEdit) { e.preventDefault(); toggleStylePanel(); }
     if (e.key === 'Delete' && state.selected) hideSelectedEl();
     if (state.selected && !textEdit && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key) >= 0) {
@@ -533,9 +621,11 @@
 
   function hideSelectedEl() {
     if (!state.selected) return;
-    var old = getComputedStyle(state.selected).display;
-    state.selected.style.display = 'none';
-    sendChange({ type: 'style', element: desc(state.selected), selector: cssPath(state.selected), changes: { display: { from: old, to: 'none' } }, url: location.pathname });
+    var el = state.selected;
+    var old = getComputedStyle(el).display;
+    el.style.display = 'none';
+    var change = { type: 'style', element: desc(el), selector: cssPath(el), changes: { display: { from: old, to: 'none' } }, url: location.pathname };
+    sendChangeWithUndo(change, function() { el.style.display = old; }, function() { el.style.display = 'none'; });
     deselectEl();
   }
 
@@ -674,12 +764,15 @@
   function wireInput(input, prop) {
     var handler = function() {
       if (!state.selected) return;
-      var old = getComputedStyle(state.selected)[prop];
+      var el = state.selected;
+      var old = getComputedStyle(el)[prop];
       var val = input.value;
       if (/^(margin|padding)/.test(prop) && val && !/[a-z%]/.test(val)) val += 'px';
-      state.selected.style[prop] = val;
+      el.style[prop] = val;
       syncSel();
-      sendChange({ type: 'style', element: desc(state.selected), selector: cssPath(state.selected), changes: { [prop]: { from: old, to: val } }, url: location.pathname });
+      var change = { type: 'style', element: desc(el), selector: cssPath(el), changes: { [prop]: { from: old, to: val } }, url: location.pathname };
+      var savedEl = el, savedOld = old, savedVal = val, savedProp = prop;
+      sendChangeWithUndo(change, function() { savedEl.style[savedProp] = savedOld; }, function() { savedEl.style[savedProp] = savedVal; });
     };
     if (input.type === 'range' || input.type === 'color') input.addEventListener('input', handler);
     else if (input.tagName === 'SELECT') input.addEventListener('change', handler);
@@ -738,6 +831,79 @@
     if (s === 'synced') setTimeout(function() { shimmer.style.display = 'none'; }, 2500);
   }
   function hideShimmer() { shimmer.style.display = 'none'; }
+
+  // ── Action Bar (Undo / Redo / Save) ──────────────────────
+  var actionBar = mk('div', 'moldui-action-bar', overlay);
+  actionBar.style.pointerEvents = 'auto';
+
+  var undoBtn = document.createElement('button');
+  undoBtn.className = 'moldui-ab-btn';
+  undoBtn.title = 'Undo (Cmd+Z)';
+  undoBtn.textContent = '\u21A9 Undo';
+  undoBtn.addEventListener('click', performUndo);
+  actionBar.appendChild(undoBtn);
+
+  var redoBtn = document.createElement('button');
+  redoBtn.className = 'moldui-ab-btn';
+  redoBtn.title = 'Redo (Cmd+Shift+Z)';
+  redoBtn.textContent = '\u21AA Redo';
+  redoBtn.addEventListener('click', performRedo);
+  actionBar.appendChild(redoBtn);
+
+  var abSep = mk('div', 'moldui-ab-sep', actionBar);
+
+  var saveBtn = document.createElement('button');
+  saveBtn.className = 'moldui-ab-btn moldui-ab-save';
+  saveBtn.title = 'Save changes to source code (Cmd+S)';
+  saveBtn.textContent = 'Save';
+  saveBtn.addEventListener('click', performSave);
+  actionBar.appendChild(saveBtn);
+
+  var changeBadge = mk('span', 'moldui-ab-badge', actionBar);
+  changeBadge.style.display = 'none';
+
+  function updateActionBar() {
+    undoBtn.disabled = undoStack.length === 0;
+    redoBtn.disabled = redoStack.length === 0;
+    undoBtn.style.opacity = undoStack.length === 0 ? '0.35' : '1';
+    redoBtn.style.opacity = redoStack.length === 0 ? '0.35' : '1';
+
+    if (saveState === 'dirty') {
+      saveBtn.textContent = 'Save';
+      saveBtn.className = 'moldui-ab-btn moldui-ab-save moldui-ab-dirty';
+      saveBtn.disabled = false;
+    } else if (saveState === 'saving') {
+      saveBtn.textContent = 'Saving...';
+      saveBtn.className = 'moldui-ab-btn moldui-ab-save moldui-ab-saving';
+      saveBtn.disabled = true;
+    } else if (saveState === 'saved') {
+      saveBtn.textContent = '\u2713 Saved';
+      saveBtn.className = 'moldui-ab-btn moldui-ab-save moldui-ab-saved';
+      saveBtn.disabled = true;
+    } else {
+      saveBtn.textContent = 'Save';
+      saveBtn.className = 'moldui-ab-btn moldui-ab-save';
+      saveBtn.disabled = true;
+      saveBtn.style.opacity = '0.35';
+    }
+
+    // Badge with pending change count
+    if (pendingChanges.length > 0) {
+      changeBadge.textContent = pendingChanges.length;
+      changeBadge.style.display = 'inline-flex';
+    } else {
+      changeBadge.style.display = 'none';
+    }
+  }
+  updateActionBar();
+
+  // Cmd+S to save
+  document.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      performSave();
+    }
+  }, true);
 
   // ── Status Bar ───────────────────────────────────────────
   var statusBar = mk('div', 'moldui-status-bar', overlay);
