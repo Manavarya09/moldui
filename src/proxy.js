@@ -9,13 +9,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export function createProxy(targetPort, proxyPort, wsPort) {
   const proxy = httpProxy.createProxyServer({ target: `http://localhost:${targetPort}`, ws: true });
 
-  // Serve editor assets from /__clayui__/*
+  // Serve editor assets from /__moldui__/*
   const editorDir = join(__dirname, 'inject');
 
   const server = http.createServer((req, res) => {
     // Serve editor assets
-    if (req.url.startsWith('/__clayui__/')) {
-      const filename = req.url.replace('/__clayui__/', '');
+    if (req.url.startsWith('/__moldui__/')) {
+      const filename = req.url.replace('/__moldui__/', '');
       const filepath = join(editorDir, filename);
       if (existsSync(filepath)) {
         const ext = filename.split('.').pop();
@@ -66,8 +66,8 @@ export function createProxy(targetPort, proxyPort, wsPort) {
 
         // Inject editor script before </body> or at end
         const injectScript = `
-<script>window.__CLAYUI_WS_PORT__=${wsPort};</script>
-<script src="/__clayui__/editor.js"></script>
+<script>window.__MOLDUI_WS_PORT__=${wsPort};</script>
+<script src="/__moldui__/editor.js"></script>
 `;
         if (html.includes('</body>')) {
           html = html.replace('</body>', injectScript + '</body>');
@@ -85,7 +85,7 @@ export function createProxy(targetPort, proxyPort, wsPort) {
     // Proxy the request
     proxy.web(req, res, {}, (err) => {
       res.writeHead(502, { 'Content-Type': 'text/plain' });
-      res.end('clayui proxy error: ' + err.message);
+      res.end('moldui proxy error: ' + err.message);
     });
   });
 

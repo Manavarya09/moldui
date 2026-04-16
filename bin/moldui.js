@@ -14,7 +14,7 @@ import { UndoManager } from '../src/undo.js';
 const program = new Command();
 
 program
-  .name('clayui')
+  .name('moldui')
   .description('Mold your UI like clay. Visual editor overlay for any running web app.')
   .version('1.0.0');
 
@@ -26,7 +26,7 @@ program
   .option('--dir <path>', 'project directory', process.cwd())
   .action(async (target, opts) => {
     console.log('');
-    console.log(chalk.bold('  clayui'));
+    console.log(chalk.bold('  moldui'));
     console.log(chalk.gray('  Mold your UI like clay.'));
     console.log('');
 
@@ -57,8 +57,8 @@ program
         targetPort = await detectDevServer();
         if (!targetPort) {
           spinner.fail('No dev server found. Start your dev server first, or pass the port:');
-          console.log(chalk.gray('\n  clayui 3000'));
-          console.log(chalk.gray('  clayui http://localhost:5173\n'));
+          console.log(chalk.gray('\n  moldui 3000'));
+          console.log(chalk.gray('  moldui http://localhost:5173\n'));
           process.exit(1);
         }
       }

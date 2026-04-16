@@ -1,13 +1,13 @@
 {
-  "name": "clayui",
-  "description": "Visual drag-and-drop editor for any running web app. Mold your UI like clay — drag, resize, edit text, change styles — and Claude syncs every change back to your source code.",
+  "name": "moldui",
+  "description": "Mold your UI. Visual drag-and-drop editor for any running web app — drag, resize, edit text, change styles — and Claude syncs every change back to your source code.",
   "version": "1.0.0",
   "author": {
     "name": "masyv",
     "url": "https://github.com/Manavarya09"
   },
-  "homepage": "https://github.com/Manavarya09/clayui",
-  "repository": "https://github.com/Manavarya09/clayui",
+  "homepage": "https://github.com/Manavarya09/moldui",
+  "repository": "https://github.com/Manavarya09/moldui",
   "license": "MIT",
   "keywords": ["visual-editor", "drag-drop", "design", "ui", "canvas"],
   "skills": "./skills/"

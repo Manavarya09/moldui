@@ -1,7 +1,7 @@
 export function buildSyncPrompt(changes, framework, sourceHints) {
   const lines = [];
 
-  lines.push('The user visually edited their running web app using clayui. Translate these DOM changes into source code edits.');
+  lines.push('The user visually edited their running web app using moldui. Translate these DOM changes into source code edits.');
   lines.push('');
   lines.push(`Framework: ${formatFramework(framework)}`);
   lines.push(`Styling: ${framework.styling}`);

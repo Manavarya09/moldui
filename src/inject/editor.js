@@ -1,29 +1,29 @@
 (function() {
   'use strict';
-  if (window.__CLAYUI_ACTIVE__) return;
-  window.__CLAYUI_ACTIVE__ = true;
+  if (window.__MOLDUI_ACTIVE__) return;
+  window.__MOLDUI_ACTIVE__ = true;
 
   // ── Shadow DOM Host ──────────────────────────────────────
   var host = document.createElement('div');
-  host.id = '__clayui-host__';
+  host.id = '__moldui-host__';
   host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;pointer-events:none;';
   document.body.appendChild(host);
   var shadow = host.attachShadow({ mode: 'open' });
 
   var link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = '/__clayui__/editor.css';
+  link.href = '/__moldui__/editor.css';
   shadow.appendChild(link);
 
   var overlay = document.createElement('div');
-  overlay.className = 'clayui-overlay';
+  overlay.className = 'moldui-overlay';
   shadow.appendChild(overlay);
 
   // ── State ────────────────────────────────────────────────
   var state = { selected: null, hovered: null, mode: 'select', wsConnected: false };
 
   // ── WebSocket ────────────────────────────────────────────
-  var wsPort = window.__CLAYUI_WS_PORT__ || 4445;
+  var wsPort = window.__MOLDUI_WS_PORT__ || 4445;
   var ws;
 
   function connectWS() {
@@ -47,7 +47,7 @@
   }
 
   // ── Helpers ──────────────────────────────────────────────
-  function isEditor(el) { return el && (el === host || host.contains(el) || el.id === '__clayui-host__'); }
+  function isEditor(el) { return el && (el === host || host.contains(el) || el.id === '__moldui-host__'); }
 
   function elLabel(el) {
     var s = el.tagName.toLowerCase();
@@ -99,13 +99,13 @@
   }
 
   // ── Selection Layer ──────────────────────────────────────
-  var selBox = mk('div', 'clayui-selection-box', overlay);
-  var hovBox = mk('div', 'clayui-hover-box', overlay);
-  var hovLabel = mk('div', 'clayui-hover-label', overlay);
-  var handleWrap = mk('div', 'clayui-handles', overlay);
+  var selBox = mk('div', 'moldui-selection-box', overlay);
+  var hovBox = mk('div', 'moldui-hover-box', overlay);
+  var hovLabel = mk('div', 'moldui-hover-label', overlay);
+  var handleWrap = mk('div', 'moldui-handles', overlay);
   var handles = {};
   ['nw','n','ne','e','se','s','sw','w'].forEach(function(pos) {
-    var h = mk('div', 'clayui-handle clayui-handle-' + pos, handleWrap);
+    var h = mk('div', 'moldui-handle moldui-handle-' + pos, handleWrap);
     h.dataset.pos = pos;
     h.style.pointerEvents = 'auto';
     handles[pos] = h;
@@ -322,7 +322,7 @@
   }, true);
 
   // ── Floating Toolbar ─────────────────────────────────────
-  var toolbar = mk('div', 'clayui-toolbar', overlay);
+  var toolbar = mk('div', 'moldui-toolbar', overlay);
   toolbar.style.pointerEvents = 'auto';
   var tbBtns = [
     { a: 'text', label: 'Edit Text' },
@@ -373,7 +373,7 @@
   }
 
   // ── Style Panel ──────────────────────────────────────────
-  var stylePanel = mk('div', 'clayui-style-panel', overlay);
+  var stylePanel = mk('div', 'moldui-style-panel', overlay);
   stylePanel.style.pointerEvents = 'auto';
   var stylePanelOpen = false;
 
@@ -392,10 +392,10 @@
     while (stylePanel.firstChild) stylePanel.removeChild(stylePanel.firstChild);
 
     // Header
-    var header = mk('div', 'clayui-sp-header', stylePanel);
-    var title = mk('span', 'clayui-sp-title', header);
+    var header = mk('div', 'moldui-sp-header', stylePanel);
+    var title = mk('span', 'moldui-sp-title', header);
     title.textContent = elLabel(el);
-    var closeBtn = mk('button', 'clayui-sp-close', header);
+    var closeBtn = mk('button', 'moldui-sp-close', header);
     closeBtn.textContent = '\u00d7';
     closeBtn.addEventListener('click', hideStylePanel);
 
@@ -452,14 +452,14 @@
   }
 
   function buildSection(parent, title, fields) {
-    var sec = mk('div', 'clayui-sp-section', parent);
-    var t = mk('div', 'clayui-sp-section-title', sec);
+    var sec = mk('div', 'moldui-sp-section', parent);
+    var t = mk('div', 'moldui-sp-section-title', sec);
     t.textContent = title;
     fields.forEach(function(f) { buildField(sec, f); });
   }
 
   function buildField(parent, f) {
-    var row = mk('div', 'clayui-sp-row', parent);
+    var row = mk('div', 'moldui-sp-row', parent);
     var lbl = document.createElement('label');
     lbl.textContent = f.label;
     row.appendChild(lbl);
@@ -475,7 +475,7 @@
         input.appendChild(opt);
       });
     } else if (f.type === 'color') {
-      var wrap = mk('div', 'clayui-sp-color-row', row);
+      var wrap = mk('div', 'moldui-sp-color-row', row);
       var cInput = document.createElement('input');
       cInput.type = 'color'; cInput.dataset.prop = f.prop; cInput.value = rgb2hex(f.val);
       var tInput = document.createElement('input');
@@ -490,7 +490,7 @@
       input = document.createElement('input');
       input.type = 'range'; input.dataset.prop = f.prop;
       input.min = f.min; input.max = f.max; input.step = f.step; input.value = f.val;
-      var valSpan = mk('span', 'clayui-sp-range-val', row);
+      var valSpan = mk('span', 'moldui-sp-range-val', row);
       valSpan.textContent = f.val;
       input.addEventListener('input', function() { valSpan.textContent = input.value; });
     } else {
@@ -520,7 +520,7 @@
   }
 
   // ── Viewport Bar ─────────────────────────────────────────
-  var vpBar = mk('div', 'clayui-viewport-bar', overlay);
+  var vpBar = mk('div', 'moldui-viewport-bar', overlay);
   vpBar.style.pointerEvents = 'auto';
   [{ vp: '375', label: '375' }, { vp: '768', label: '768' }, { vp: '1024', label: '1024' }, { vp: '1280', label: '1280' }, { vp: 'full', label: 'Full' }].forEach(function(v) {
     var btn = document.createElement('button');
@@ -541,7 +541,7 @@
   });
 
   // ── Breadcrumb ───────────────────────────────────────────
-  var breadcrumb = mk('div', 'clayui-breadcrumb', overlay);
+  var breadcrumb = mk('div', 'moldui-breadcrumb', overlay);
   breadcrumb.style.pointerEvents = 'auto';
 
   function updateBreadcrumb(el) {
@@ -550,10 +550,10 @@
     while (breadcrumb.firstChild) breadcrumb.removeChild(breadcrumb.firstChild);
     parts.forEach(function(p, i) {
       if (i > 0) {
-        var sep = mk('span', 'clayui-bc-sep', breadcrumb);
+        var sep = mk('span', 'moldui-bc-sep', breadcrumb);
         sep.textContent = '\u203a';
       }
-      var item = mk('span', 'clayui-bc-item' + (i === parts.length - 1 ? ' active' : ''), breadcrumb);
+      var item = mk('span', 'moldui-bc-item' + (i === parts.length - 1 ? ' active' : ''), breadcrumb);
       item.textContent = elLabel(p);
       item.addEventListener('click', function() { selectEl(p); });
     });
@@ -561,11 +561,11 @@
   }
 
   // ── Shimmer Bar ──────────────────────────────────────────
-  var shimmer = mk('div', 'clayui-shimmer', overlay);
-  var shimmerText = mk('div', 'clayui-shimmer-text', shimmer);
+  var shimmer = mk('div', 'moldui-shimmer', overlay);
+  var shimmerText = mk('div', 'moldui-shimmer-text', shimmer);
 
   function showShimmer(s, text) {
-    shimmer.className = 'clayui-shimmer clayui-shimmer-' + s;
+    shimmer.className = 'moldui-shimmer moldui-shimmer-' + s;
     shimmerText.textContent = text || '';
     shimmer.style.display = 'flex';
     if (s === 'synced') setTimeout(function() { shimmer.style.display = 'none'; }, 2500);
@@ -573,12 +573,12 @@
   function hideShimmer() { shimmer.style.display = 'none'; }
 
   // ── Status Bar ───────────────────────────────────────────
-  var statusBar = mk('div', 'clayui-status-bar', overlay);
+  var statusBar = mk('div', 'moldui-status-bar', overlay);
   statusBar.style.pointerEvents = 'auto';
   function updateStatusBar() {
     while (statusBar.firstChild) statusBar.removeChild(statusBar.firstChild);
     statusBar.appendChild(document.createTextNode(state.wsConnected ? '\u{1F7E2} ' : '\u{1F534} '));
-    var items = ['clayui', 'S styles', 'Dbl-click text', 'Esc deselect', 'Cmd+Z undo'];
+    var items = ['moldui', 'S styles', 'Dbl-click text', 'Esc deselect', 'Cmd+Z undo'];
     items.forEach(function(t, i) {
       if (i > 0) statusBar.appendChild(document.createTextNode(' \u00b7 '));
       var span = document.createElement('span');
@@ -589,7 +589,7 @@
   updateStatusBar();
 
   // ── Dimensions Label ─────────────────────────────────────
-  var dimLabel = mk('div', 'clayui-dim-label', overlay);
+  var dimLabel = mk('div', 'moldui-dim-label', overlay);
   function showDim(el) {
     var r = el.getBoundingClientRect();
     dimLabel.textContent = Math.round(r.width) + ' \u00d7 ' + Math.round(r.height);
@@ -597,5 +597,5 @@
   }
   function hideDim() { dimLabel.style.display = 'none'; }
 
-  console.log('[clayui] Editor loaded. Click to select, drag to move, double-click to edit text, S for styles.');
+  console.log('[moldui] Editor loaded. Click to select, drag to move, double-click to edit text, S for styles.');
 })();

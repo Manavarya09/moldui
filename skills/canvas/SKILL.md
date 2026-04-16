@@ -3,7 +3,7 @@ name: canvas
 description: "Visual editor overlay for any running web app. Drag, resize, edit text, change styles in the browser — changes sync to source code. Triggers: /canvas, visual edit, drag drop editor, mold UI"
 ---
 
-# clayui — Visual Editor
+# moldui — Visual Editor
 
 Launch a visual editing overlay on any running dev server. The user can drag elements, resize them, edit text inline, and adjust styles — all changes are synced back to source code.
 
@@ -41,7 +41,7 @@ The WebSocket sends change descriptors. Build a sync prompt and execute the edit
 ## Starting the Editor
 
 ```bash
-node ${CLAUDE_PLUGIN_ROOT}/bin/clayui.js [port]
+node ${CLAUDE_PLUGIN_ROOT}/bin/moldui.js [port]
 ```
 
 The editor proxy starts and auto-opens the browser. Changes arrive as structured JSON via WebSocket.
