@@ -642,15 +642,17 @@
   var toolbar = mk('div', 'moldui-toolbar', overlay);
   toolbar.style.pointerEvents = 'auto';
   var tbBtns = [
-    { a: 'text', label: 'Edit Text' },
-    { a: 'style', label: 'Style' },
-    { a: 'dup', label: 'Duplicate' },
-    { a: 'hide', label: 'Hide' }
+    { a: 'text', label: 'Text', tip: 'Edit inline text (double-click element)' },
+    { a: 'style', label: 'Style', tip: 'Open style panel · S' },
+    { a: 'dup', label: 'Duplicate', tip: 'Clone this element' },
+    { a: 'hide', label: 'Hide', tip: 'Hide · Delete' }
   ];
   tbBtns.forEach(function(b) {
     var btn = document.createElement('button');
     btn.dataset.a = b.a;
     btn.textContent = b.label;
+    btn.title = b.tip;
+    btn.setAttribute('data-moldui-tip', b.tip);
     toolbar.appendChild(btn);
   });
 
@@ -904,15 +906,17 @@
 
   var undoBtn = document.createElement('button');
   undoBtn.className = 'moldui-ab-btn';
-  undoBtn.title = 'Undo (Cmd+Z)';
-  undoBtn.textContent = '\u21A9 Undo';
+  undoBtn.title = 'Undo · ⌘Z';
+  undoBtn.setAttribute('data-moldui-tip', 'Undo · ⌘Z');
+  undoBtn.textContent = '\u21A9';
   undoBtn.addEventListener('click', performUndo);
   actionBar.appendChild(undoBtn);
 
   var redoBtn = document.createElement('button');
   redoBtn.className = 'moldui-ab-btn';
-  redoBtn.title = 'Redo (Cmd+Shift+Z)';
-  redoBtn.textContent = '\u21AA Redo';
+  redoBtn.title = 'Redo · ⌘⇧Z';
+  redoBtn.setAttribute('data-moldui-tip', 'Redo · ⌘⇧Z');
+  redoBtn.textContent = '\u21AA';
   redoBtn.addEventListener('click', performRedo);
   actionBar.appendChild(redoBtn);
 
@@ -920,7 +924,8 @@
 
   var saveBtn = document.createElement('button');
   saveBtn.className = 'moldui-ab-btn moldui-ab-save';
-  saveBtn.title = 'Save changes to source code (Cmd+S)';
+  saveBtn.title = 'Save changes to source code · ⌘S';
+  saveBtn.setAttribute('data-moldui-tip', 'Write changes to source · ⌘S');
   saveBtn.textContent = 'Save';
   saveBtn.addEventListener('click', performSave);
   actionBar.appendChild(saveBtn);
@@ -976,10 +981,20 @@
   statusBar.style.pointerEvents = 'auto';
   function updateStatusBar() {
     while (statusBar.firstChild) statusBar.removeChild(statusBar.firstChild);
-    statusBar.appendChild(document.createTextNode(state.wsConnected ? '\u{1F7E2} ' : '\u{1F534} '));
-    var items = ['moldui', 'S styles', 'L layers', 'Cmd+K search', '? shortcuts', 'Cmd+Z undo'];
-    items.forEach(function(t, i) {
-      if (i > 0) statusBar.appendChild(document.createTextNode(' \u00b7 '));
+    // Neon dot indicator
+    var dot = document.createElement('span');
+    dot.className = 'moldui-sb-dot' + (state.wsConnected ? '' : ' offline');
+    statusBar.appendChild(dot);
+    var brand = document.createElement('span');
+    brand.style.cssText = 'font-weight:600;color:var(--moldui-primary);letter-spacing:0.05em;';
+    brand.textContent = 'MOLDUI';
+    statusBar.appendChild(brand);
+    var items = ['S styles', 'L layers', '⌘K search', '? help', '⌘Z undo'];
+    items.forEach(function(t) {
+      var sep = document.createElement('span');
+      sep.style.color = 'rgba(255,255,255,0.08)';
+      sep.textContent = '│';
+      statusBar.appendChild(sep);
       var span = document.createElement('span');
       span.textContent = t;
       statusBar.appendChild(span);
@@ -1539,5 +1554,107 @@
     if (layersPanelOpen) renderLayersTree();
   };
 
-  console.log('[moldui] v2.0 loaded. Press ? for shortcuts. Cmd+K to search, L for layers, Cmd+/ for AI chat.');
+  // ═════════════════════════════════════════════════════════
+  // v2.2 — Welcome card + guided nudges
+  // ═════════════════════════════════════════════════════════
+
+  // Welcome card — shown when the editor first loads (once per origin, dismissible)
+  var welcome = mk('div', 'moldui-welcome', overlay);
+  var welcomeHead = mk('div', 'moldui-welcome-head', welcome);
+  var welcomeTitle = mk('div', 'moldui-welcome-title', welcomeHead);
+  welcomeTitle.appendChild(document.createTextNode('moldui is live'));
+  var welcomeClose = document.createElement('button');
+  welcomeClose.className = 'moldui-welcome-close';
+  welcomeClose.textContent = '\u00d7';
+  welcomeClose.setAttribute('aria-label', 'Close welcome');
+  welcomeHead.appendChild(welcomeClose);
+
+  var welcomeBody = mk('div', 'moldui-welcome-body', welcome);
+  welcomeBody.appendChild(document.createTextNode('Click any element to edit it. Drag to move, grab handles to resize, double-click to edit text.'));
+
+  var tips = mk('div', 'moldui-welcome-tips', welcome);
+  var tipData = [
+    ['S', 'Style panel'],
+    ['L', 'Layers'],
+    ['⌘K', 'Find element'],
+    ['?', 'All shortcuts']
+  ];
+  tipData.forEach(function(t) {
+    var row = mk('div', 'moldui-welcome-tip', tips);
+    var kbd = mk('span', 'moldui-welcome-kbd', row);
+    kbd.textContent = t[0];
+    row.appendChild(document.createTextNode(t[1]));
+  });
+
+  function hideWelcome() {
+    welcome.classList.add('hiding');
+    setTimeout(function() { welcome.style.display = 'none'; }, 250);
+  }
+  welcomeClose.addEventListener('click', hideWelcome);
+
+  // Show welcome only after tour is done and only once per session
+  var welcomeShown = false;
+  try { welcomeShown = sessionStorage.getItem('__moldui_welcome_seen__') === '1'; } catch(x) {}
+  if (welcomeShown) {
+    welcome.style.display = 'none';
+  } else {
+    // Wait for tour to finish (or skip) before showing
+    setTimeout(function() {
+      var tourDone = false;
+      try { tourDone = localStorage.getItem('__moldui_tour_done__') === '1'; } catch(x) {}
+      // If tour is running, don't show welcome until it's done
+      if (!tourDone) {
+        // Poll briefly for tour end
+        var poll = setInterval(function() {
+          try {
+            if (localStorage.getItem('__moldui_tour_done__') === '1') {
+              clearInterval(poll);
+              if (!sessionStorage.getItem('__moldui_welcome_seen__')) welcome.style.display = 'block';
+            }
+          } catch(x) { clearInterval(poll); }
+        }, 500);
+        // Give up after 60s
+        setTimeout(function() { clearInterval(poll); }, 60000);
+      } else {
+        welcome.style.display = 'block';
+      }
+      try { sessionStorage.setItem('__moldui_welcome_seen__', '1'); } catch(x) {}
+    }, 1500);
+  }
+
+  // Auto-hide welcome when user first selects something
+  var _origSelectElForWelcome = selectEl;
+  selectEl = function(el) {
+    _origSelectElForWelcome(el);
+    if (welcome.style.display !== 'none' && !welcome.classList.contains('hiding')) hideWelcome();
+  };
+
+  // ── Guided nudges ────────────────────────────────────────
+  var nudge = mk('div', 'moldui-nudge', overlay);
+  var nudgeTimer = null;
+  function showNudge(text, duration) {
+    nudge.textContent = '';
+    nudge.appendChild(document.createTextNode(text));
+    nudge.classList.add('show');
+    if (nudgeTimer) clearTimeout(nudgeTimer);
+    nudgeTimer = setTimeout(function() { nudge.classList.remove('show'); }, duration || 4000);
+  }
+
+  // First-edit nudge — after user makes their first change
+  var _firstEditNudged = false;
+  try { _firstEditNudged = sessionStorage.getItem('__moldui_first_edit_nudged__') === '1'; } catch(x) {}
+
+  var _origPushUndo = pushUndo;
+  pushUndo = function(entry) {
+    _origPushUndo(entry);
+    if (!_firstEditNudged && undoStack.length === 1) {
+      _firstEditNudged = true;
+      try { sessionStorage.setItem('__moldui_first_edit_nudged__', '1'); } catch(x) {}
+      setTimeout(function() {
+        showNudge('Nice! Click Save (top-right) to write your changes to source code', 5000);
+      }, 800);
+    }
+  };
+
+  console.log('[moldui] v2.2 loaded. Press ? for shortcuts. Cmd+K to search, L for layers, Cmd+/ for AI chat.');
 })();

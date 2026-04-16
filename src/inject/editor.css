@@ -1,37 +1,86 @@
-/* moldui editor overlay — injected into shadow DOM */
+/* moldui editor overlay — glassmorphism + neon glow theme */
+
+:host {
+  /* Brand accents */
+  --moldui-primary: #22d3ee;           /* cyan */
+  --moldui-primary-dim: #0891b2;
+  --moldui-secondary: #a78bfa;         /* violet */
+  --moldui-secondary-dim: #7c3aed;
+  --moldui-accent: #f472b6;            /* pink */
+  --moldui-success: #34d399;
+  --moldui-danger: #f87171;
+  --moldui-warn: #fbbf24;
+
+  /* Glass surfaces */
+  --moldui-glass: rgba(13, 15, 24, 0.68);
+  --moldui-glass-strong: rgba(13, 15, 24, 0.82);
+  --moldui-glass-heavy: rgba(13, 15, 24, 0.94);
+  --moldui-border: rgba(255, 255, 255, 0.08);
+  --moldui-border-strong: rgba(255, 255, 255, 0.14);
+
+  /* Neon glow mixes */
+  --moldui-glow-cyan: 0 0 0 1px rgba(34, 211, 238, 0.35), 0 0 24px rgba(34, 211, 238, 0.25);
+  --moldui-glow-violet: 0 0 0 1px rgba(167, 139, 250, 0.35), 0 0 24px rgba(167, 139, 250, 0.25);
+
+  /* Text */
+  --moldui-text: #e5e7eb;
+  --moldui-text-dim: #9ca3af;
+  --moldui-text-faint: #6b7280;
+  --moldui-text-heading: #f3f4f6;
+}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .moldui-overlay {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   pointer-events: none; z-index: 2147483646;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  color: var(--moldui-text);
+}
+
+/* Ambient background glow — tiny fixed gradient for the whole editor */
+.moldui-overlay::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+  background:
+    radial-gradient(600px circle at 10% 100%, rgba(34, 211, 238, 0.04), transparent 40%),
+    radial-gradient(500px circle at 100% 0%, rgba(167, 139, 250, 0.04), transparent 40%);
 }
 
 /* ── Selection & Hover ──────────────────────────────── */
 
 .moldui-selection-box {
-  display: none; border: 2px solid #3b82f6; border-radius: 2px;
-  pointer-events: none; transition: all 0.08s ease-out;
+  display: none; border: 1.5px solid var(--moldui-primary); border-radius: 3px;
+  pointer-events: none; transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--moldui-glow-cyan), inset 0 0 0 1px rgba(34, 211, 238, 0.12);
 }
 .moldui-hover-box {
-  display: none; border: 1px dashed rgba(59,130,246,0.5); border-radius: 2px;
-  pointer-events: none; transition: all 0.05s ease-out;
+  display: none; border: 1px dashed rgba(34, 211, 238, 0.5); border-radius: 3px;
+  pointer-events: none; transition: all 0.08s ease-out;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.15);
 }
 .moldui-hover-label {
-  display: none; background: #3b82f6; color: #fff; font: 500 10px/1 monospace;
-  padding: 2px 6px; border-radius: 3px; white-space: nowrap; pointer-events: none;
+  display: none; padding: 3px 8px; border-radius: 5px;
+  background: linear-gradient(135deg, var(--moldui-primary-dim), var(--moldui-primary));
+  color: #0a0a14; font: 600 10px/1 'JetBrains Mono', ui-monospace, monospace;
+  white-space: nowrap; pointer-events: none;
+  box-shadow: 0 2px 12px rgba(34, 211, 238, 0.35);
+  letter-spacing: 0.02em;
 }
 
 /* ── Resize Handles ─────────────────────────────────── */
 
 .moldui-handles { display: none; pointer-events: none; }
 .moldui-handle {
-  position: absolute; width: 8px; height: 8px;
-  background: #fff; border: 2px solid #3b82f6; border-radius: 2px;
-  pointer-events: auto; cursor: pointer; transition: transform 0.1s;
+  position: absolute; width: 10px; height: 10px;
+  background: #fff; border: 1.5px solid var(--moldui-primary); border-radius: 3px;
+  pointer-events: auto; cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.6), 0 2px 4px rgba(0,0,0,0.3);
 }
-.moldui-handle:hover { transform: scale(1.3); }
+.moldui-handle:hover {
+  transform: scale(1.35);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.9), 0 2px 6px rgba(0,0,0,0.4);
+}
 .moldui-handle-nw { top: -5px; left: -5px; cursor: nw-resize; }
 .moldui-handle-n  { top: -5px; left: calc(50% - 4px); cursor: n-resize; }
 .moldui-handle-ne { top: -5px; right: -5px; cursor: ne-resize; }
@@ -45,26 +94,38 @@
 
 .moldui-toolbar {
   display: none; position: fixed;
-  background: rgba(10,10,15,0.92); backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
-  padding: 4px; gap: 2px; z-index: 4;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  background: var(--moldui-glass);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--moldui-border-strong); border-radius: 12px;
+  padding: 5px; gap: 2px; z-index: 4;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .moldui-toolbar button {
-  background: transparent; color: #d1d5db; border: none;
-  padding: 7px 11px; border-radius: 7px; font: 500 11px/1 system-ui;
-  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  background: transparent; color: var(--moldui-text); border: none;
+  padding: 7px 12px; border-radius: 8px;
+  font: 500 11px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.01em;
+  cursor: pointer; transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap; position: relative;
 }
-.moldui-toolbar button:hover { background: rgba(59,130,246,0.25); color: #fff; }
+.moldui-toolbar button:hover {
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--moldui-primary);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.2);
+}
+.moldui-toolbar button:active { transform: scale(0.96); }
 
 /* ── Style Panel ────────────────────────────────────── */
 
 .moldui-style-panel {
-  display: none; position: fixed; top: 0; right: 0; width: 280px; height: 100vh;
-  background: rgba(10,10,15,0.96); backdrop-filter: blur(20px);
-  border-left: 1px solid rgba(255,255,255,0.08);
-  overflow-y: auto; color: #d1d5db; font: 12px/1.5 system-ui; z-index: 5;
-  scrollbar-width: thin; scrollbar-color: #333 transparent;
+  display: none; position: fixed; top: 8px; right: 8px;
+  width: 288px; max-height: calc(100vh - 76px);
+  background: var(--moldui-glass-strong);
+  backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--moldui-border-strong); border-radius: 14px;
+  overflow-y: auto; color: var(--moldui-text);
+  font: 12px/1.5 'Inter', system-ui, sans-serif; z-index: 5;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .moldui-style-panel::-webkit-scrollbar { width: 5px; }
 .moldui-style-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
@@ -159,19 +220,26 @@
 .moldui-viewport-bar {
   position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 2px;
-  background: rgba(10,10,15,0.92); backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
-  padding: 4px; z-index: 4;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  background: var(--moldui-glass);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--moldui-border-strong); border-radius: 12px;
+  padding: 5px; z-index: 4;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
   pointer-events: auto;
 }
 .moldui-viewport-bar button {
-  background: transparent; color: #6b7280; border: none;
-  padding: 6px 12px; border-radius: 7px; font: 500 11px/1 system-ui;
-  cursor: pointer; transition: all 0.15s;
+  background: transparent; color: var(--moldui-text-faint); border: none;
+  padding: 6px 13px; border-radius: 8px;
+  font: 500 11px/1 'JetBrains Mono', ui-monospace, monospace;
+  cursor: pointer; transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.02em;
 }
-.moldui-viewport-bar button:hover { color: #d1d5db; }
-.moldui-viewport-bar button.active { background: #3b82f6; color: #fff; }
+.moldui-viewport-bar button:hover { color: var(--moldui-text); }
+.moldui-viewport-bar button.active {
+  background: linear-gradient(135deg, var(--moldui-secondary-dim), var(--moldui-secondary));
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(167, 139, 250, 0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+}
 
 /* ── Breadcrumb ─────────────────────────────────────── */
 
@@ -203,19 +271,22 @@
   backdrop-filter: blur(8px);
 }
 .moldui-shimmer-working {
-  background: linear-gradient(90deg, #1e3a8a, #0e7490, #6d28d9, #1e3a8a);
+  background: linear-gradient(90deg, #0891b2, #22d3ee, #a78bfa, #22d3ee, #0891b2);
   background-size: 300% 100%;
-  animation: moldui-shimmer-move 2s linear infinite;
+  animation: moldui-shimmer-move 1.8s linear infinite;
+  box-shadow: 0 -8px 32px rgba(34, 211, 238, 0.3);
 }
 .moldui-shimmer-synced {
-  background: linear-gradient(90deg, #065f46, #059669, #34d399, #065f46);
+  background: linear-gradient(90deg, #059669, #34d399, #67e8f9, #34d399, #059669);
   background-size: 300% 100%;
   animation: moldui-shimmer-move 0.8s linear forwards, moldui-shimmer-fade 0.5s 2s ease forwards;
+  box-shadow: 0 -8px 32px rgba(52, 211, 153, 0.3);
 }
 .moldui-shimmer-error {
-  background: linear-gradient(90deg, #7f1d1d, #dc2626, #fca5a5, #7f1d1d);
+  background: linear-gradient(90deg, #b91c1c, #f87171, #fca5a5, #f87171, #b91c1c);
   background-size: 300% 100%;
   animation: moldui-shimmer-move 1.5s linear infinite;
+  box-shadow: 0 -8px 32px rgba(248, 113, 113, 0.3);
 }
 .moldui-shimmer-text {
   position: relative; z-index: 1; color: #fff; font: 500 12px/1 system-ui;
@@ -233,14 +304,28 @@
 /* ── Status Bar ─────────────────────────────────────── */
 
 .moldui-status-bar {
-  position: fixed; bottom: 0; left: 0; width: 100%; height: 28px;
-  background: rgba(10,10,15,0.95); backdrop-filter: blur(8px);
-  border-top: 1px solid rgba(255,255,255,0.05);
-  color: #4b5563; font: 11px/28px system-ui; padding: 0 12px;
-  display: flex; align-items: center; gap: 6px; z-index: 4;
+  position: fixed; bottom: 8px; left: 8px;
+  background: var(--moldui-glass);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--moldui-border); border-radius: 10px;
+  color: var(--moldui-text-faint);
+  font: 500 10px/1 'JetBrains Mono', ui-monospace, monospace;
+  padding: 7px 12px; letter-spacing: 0.03em;
+  display: flex; align-items: center; gap: 8px; z-index: 4;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
   pointer-events: auto;
 }
-.moldui-status-bar span { color: #6b7280; }
+.moldui-status-bar span { color: var(--moldui-text-dim); }
+.moldui-status-bar .moldui-sb-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--moldui-success); box-shadow: 0 0 8px currentColor;
+  animation: moldui-sb-pulse 2s ease-in-out infinite;
+}
+.moldui-status-bar .moldui-sb-dot.offline { background: var(--moldui-danger); animation: none; }
+@keyframes moldui-sb-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.9); }
+}
 
 /* ── Dimensions Label ───────────────────────────────── */
 
@@ -306,49 +391,64 @@
 /* ── Action Bar (Undo / Redo / Save) ────────────────── */
 
 .moldui-action-bar {
-  position: fixed; top: 8px; right: 12px;
-  display: flex; align-items: center; gap: 3px;
-  background: rgba(10,10,15,0.92); backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
-  padding: 4px 6px; z-index: 4;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+  position: fixed; top: 8px; right: 8px;
+  display: flex; align-items: center; gap: 2px;
+  background: var(--moldui-glass);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--moldui-border-strong); border-radius: 12px;
+  padding: 5px 7px; z-index: 4;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
   pointer-events: auto;
 }
 
 .moldui-ab-btn {
-  background: transparent; color: #d1d5db; border: none;
-  padding: 7px 12px; border-radius: 7px; font: 500 11px/1 system-ui;
-  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  background: transparent; color: var(--moldui-text); border: none;
+  padding: 7px 13px; border-radius: 8px;
+  font: 500 11px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.01em;
+  cursor: pointer; transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap; position: relative;
 }
-.moldui-ab-btn:hover:not(:disabled) { background: rgba(59,130,246,0.2); color: #fff; }
+.moldui-ab-btn:hover:not(:disabled) {
+  background: rgba(34, 211, 238, 0.12); color: var(--moldui-primary);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.2);
+}
+.moldui-ab-btn:active:not(:disabled) { transform: scale(0.95); }
 .moldui-ab-btn:disabled { cursor: default; }
 
-.moldui-ab-sep {
-  width: 1px; height: 20px; background: rgba(255,255,255,0.1);
-  margin: 0 3px;
-}
+.moldui-ab-sep { width: 1px; height: 20px; background: var(--moldui-border); margin: 0 4px; }
 
-.moldui-ab-save {
-  color: #9ca3af;
-}
+.moldui-ab-save { color: var(--moldui-text-dim); }
+
 .moldui-ab-dirty {
-  background: #3b82f6 !important; color: #fff !important;
+  background: linear-gradient(135deg, var(--moldui-primary-dim), var(--moldui-primary)) !important;
+  color: #0a0a14 !important;
   opacity: 1 !important;
+  box-shadow: 0 2px 16px rgba(34, 211, 238, 0.4), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+  font-weight: 600 !important;
 }
-.moldui-ab-dirty:hover { background: #2563eb !important; }
+.moldui-ab-dirty:hover {
+  background: linear-gradient(135deg, var(--moldui-primary), #67e8f9) !important;
+  box-shadow: 0 2px 24px rgba(34, 211, 238, 0.6), inset 0 1px 0 rgba(255,255,255,0.25) !important;
+}
 .moldui-ab-saving {
-  background: rgba(59,130,246,0.3) !important; color: #93c5fd !important;
-  animation: moldui-pulse 1s ease infinite;
+  background: rgba(34, 211, 238, 0.18) !important;
+  color: var(--moldui-primary) !important;
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.3) !important;
+  animation: moldui-pulse 1.2s ease-in-out infinite;
 }
 .moldui-ab-saved {
-  background: rgba(16,185,129,0.2) !important; color: #34d399 !important;
+  background: rgba(52, 211, 153, 0.18) !important;
+  color: var(--moldui-success) !important;
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.3) !important;
 }
 
 .moldui-ab-badge {
   display: none; align-items: center; justify-content: center;
-  background: #ef4444; color: #fff; font: 600 9px/1 system-ui;
-  min-width: 16px; height: 16px; border-radius: 8px; padding: 0 4px;
-  margin-left: 2px;
+  background: linear-gradient(135deg, var(--moldui-accent), #ec4899);
+  color: #fff; font: 700 9px/1 'Inter', system-ui, sans-serif;
+  min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px;
+  margin-left: 3px;
+  box-shadow: 0 0 12px rgba(244, 114, 182, 0.5);
 }
 
 @keyframes moldui-pulse {
@@ -608,3 +708,114 @@
   transition: color 0.15s;
 }
 .moldui-zoom-badge:hover { color: #fff; }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* v2.2 — Hi-tech polish                                        */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* Hi-tech tooltip (any button with data-moldui-tip) */
+[data-moldui-tip] { position: relative; }
+[data-moldui-tip]::after {
+  content: attr(data-moldui-tip);
+  position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: var(--moldui-glass-heavy);
+  color: var(--moldui-text);
+  border: 1px solid var(--moldui-border-strong);
+  padding: 5px 10px; border-radius: 6px;
+  font: 500 10px/1.3 'Inter', system-ui, sans-serif;
+  white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity 0.15s ease 0.3s;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  letter-spacing: 0.01em;
+}
+[data-moldui-tip]:hover::after { opacity: 1; }
+
+/* Hi-tech welcome / empty state card */
+.moldui-welcome {
+  position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%);
+  min-width: 320px; max-width: 420px;
+  background: var(--moldui-glass-strong);
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--moldui-border-strong); border-radius: 14px;
+  padding: 18px 20px; z-index: 5;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+  pointer-events: auto;
+  animation: moldui-welcome-in 0.4s cubic-bezier(0.2, 0, 0.2, 1);
+}
+.moldui-welcome.hiding {
+  animation: moldui-welcome-out 0.25s ease forwards;
+}
+@keyframes moldui-welcome-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes moldui-welcome-out {
+  to { opacity: 0; transform: translate(-50%, 12px); }
+}
+.moldui-welcome-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.moldui-welcome-title {
+  font: 600 13px/1 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text-heading);
+  display: flex; align-items: center; gap: 8px;
+}
+.moldui-welcome-title::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--moldui-primary);
+  box-shadow: 0 0 12px var(--moldui-primary);
+  animation: moldui-sb-pulse 2s ease-in-out infinite;
+}
+.moldui-welcome-close {
+  background: transparent; border: none; color: var(--moldui-text-faint);
+  cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1;
+  transition: color 0.15s;
+}
+.moldui-welcome-close:hover { color: var(--moldui-text); }
+.moldui-welcome-body {
+  font: 12px/1.5 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text-dim);
+  margin-bottom: 12px;
+}
+.moldui-welcome-body strong { color: var(--moldui-primary); font-weight: 600; }
+.moldui-welcome-tips {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+  padding-top: 10px; border-top: 1px solid var(--moldui-border);
+}
+.moldui-welcome-tip {
+  display: flex; align-items: center; gap: 8px;
+  font: 11px/1.3 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text-dim);
+}
+.moldui-welcome-kbd {
+  display: inline-flex; align-items: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--moldui-border);
+  padding: 2px 6px; border-radius: 4px;
+  font: 500 10px/1 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--moldui-primary);
+  min-width: 24px; justify-content: center;
+}
+
+/* Guided nudge — transient hint */
+.moldui-nudge {
+  position: fixed; bottom: 56px; left: 50%; transform: translate(-50%, 8px);
+  background: var(--moldui-glass-strong);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(34, 211, 238, 0.35); border-radius: 10px;
+  padding: 10px 14px; z-index: 5;
+  font: 500 12px/1.4 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text); white-space: nowrap;
+  box-shadow: 0 8px 32px rgba(34, 211, 238, 0.15), 0 4px 16px rgba(0,0,0,0.4);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
+}
+.moldui-nudge.show {
+  opacity: 1; transform: translate(-50%, 0); pointer-events: auto;
+}
+.moldui-nudge::before {
+  content: '✦'; color: var(--moldui-primary); margin-right: 6px;
+  text-shadow: 0 0 8px currentColor;
+}
