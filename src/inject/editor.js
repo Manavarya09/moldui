@@ -349,36 +349,77 @@
     state.mode = 'drag';
   }
 
+  // Swap-drag highlight element
+  var swapHighlight = mk('div', 'moldui-swap-highlight', overlay);
+  swapHighlight.style.display = 'none';
+
   function onDrag(e) {
     if (!dragSt) return;
     // Position ghost so cursor stays at the original grab point on the element
     dragSt.ghost.style.top = (e.clientY - dragSt.offsetY) + 'px';
     dragSt.ghost.style.left = (e.clientX - dragSt.offsetX) + 'px';
 
-    // Find the container under the cursor (skip the ghost and the dragged element)
+    // Find the element under the cursor (skip ghost + dragged)
     dragSt.ghost.style.pointerEvents = 'none';
     dragSt.el.style.pointerEvents = 'none';
     var dropTarget = document.elementFromPoint(e.clientX, e.clientY);
     dragSt.el.style.pointerEvents = '';
 
-    if (!dropTarget || isEditor(dropTarget)) return;
+    if (!dropTarget || isEditor(dropTarget)) {
+      swapHighlight.style.display = 'none';
+      if (dragSt.ph.parentElement) dragSt.ph.remove();
+      dragSt.swapTarget = null;
+      return;
+    }
 
-    // Find the nearest container (element with children that isn't inline text)
+    // ── SWAP MODE: hold Alt/Option — hovering over another sibling swaps positions ──
+    var swapMode = e.altKey;
+    if (swapMode) {
+      // Find a sibling of the dragged element directly under cursor
+      var swapCandidate = dropTarget;
+      // Walk up: must be a direct sibling (same parent) of dragged element OR a nearby top-level element
+      while (swapCandidate && swapCandidate !== document.body) {
+        if (swapCandidate !== dragSt.el && swapCandidate.parentElement) {
+          var isContainerChild = swapCandidate.parentElement.children.length > 1;
+          var ccs = getComputedStyle(swapCandidate);
+          var isVisibleBlock = ccs.display !== 'inline' && (swapCandidate.getBoundingClientRect().width > 20);
+          if (isContainerChild && isVisibleBlock) break;
+        }
+        swapCandidate = swapCandidate.parentElement;
+      }
+
+      if (swapCandidate && swapCandidate !== document.body && swapCandidate !== dragSt.el && !dragSt.el.contains(swapCandidate)) {
+        // Highlight swap target
+        var sr = swapCandidate.getBoundingClientRect();
+        swapHighlight.style.cssText = 'display:block;position:fixed;top:' + sr.top + 'px;left:' + sr.left + 'px;width:' + sr.width + 'px;height:' + sr.height + 'px;pointer-events:none;';
+        dragSt.swapTarget = swapCandidate;
+        // Hide placeholder in swap mode — we're not inserting, we're swapping
+        if (dragSt.ph.parentElement) dragSt.ph.remove();
+        dragSt.targetContainer = null;
+        return;
+      } else {
+        swapHighlight.style.display = 'none';
+        dragSt.swapTarget = null;
+      }
+    } else {
+      swapHighlight.style.display = 'none';
+      dragSt.swapTarget = null;
+    }
+
+    // ── NORMAL INSERT MODE ──
     var container = dropTarget;
     while (container && container !== document.body) {
-      var ccs = getComputedStyle(container);
-      var isContainer = ccs.display === 'flex' || ccs.display === 'grid' || ccs.display === 'block' || ccs.display === 'inline-flex';
+      var ccs2 = getComputedStyle(container);
+      var isContainer = ccs2.display === 'flex' || ccs2.display === 'grid' || ccs2.display === 'block' || ccs2.display === 'inline-flex';
       if (isContainer && container.children.length > 0 && container !== dragSt.el) break;
       container = container.parentElement;
     }
     if (!container || container === document.body) container = dragSt.parent;
 
-    // Find insertion point within this container
     var children = Array.from(container.children).filter(function(c) { return c !== dragSt.el && c !== dragSt.ph; });
     var before = null;
     for (var i = 0; i < children.length; i++) {
       var cr = children[i].getBoundingClientRect();
-      // For vertical layouts, check Y; for horizontal, check X
       var parentCs = getComputedStyle(container);
       if (parentCs.flexDirection === 'row' || parentCs.flexDirection === 'row-reverse') {
         if (e.clientX < cr.left + cr.width / 2) { before = children[i]; break; }
@@ -387,18 +428,72 @@
       }
     }
 
-    // Update placeholder
     if (dragSt.ph.parentElement) dragSt.ph.remove();
     if (before) container.insertBefore(dragSt.ph, before);
     else container.appendChild(dragSt.ph);
 
-    // Track the target container
     dragSt.targetContainer = container;
   }
 
   function endDrag() {
     if (!dragSt) return;
     var el = dragSt.el, ghost = dragSt.ghost, ph = dragSt.ph, parent = dragSt.parent, startIdx = dragSt.startIdx;
+    var swapTarget = dragSt.swapTarget;
+
+    ghost.remove();
+    el.style.opacity = '';
+    el.style.pointerEvents = '';
+    swapHighlight.style.display = 'none';
+
+    // ── SWAP PATH: exchange positions between dragged el and swapTarget ──
+    if (swapTarget && swapTarget !== el && !el.contains(swapTarget) && !swapTarget.contains(el)) {
+      if (ph.parentElement) ph.remove();
+
+      // Remember original positions for undo
+      var aParent = el.parentElement, aNext = el.nextSibling;
+      var bParent = swapTarget.parentElement, bNext = swapTarget.nextSibling;
+      if (aNext === swapTarget) aNext = swapTarget.nextSibling;
+      if (bNext === el) bNext = el.nextSibling;
+
+      // Use two placeholders to swap cleanly (handles same parent + adjacent nodes)
+      var phA = document.createComment('moldui-swap-a');
+      var phB = document.createComment('moldui-swap-b');
+      aParent.insertBefore(phA, el);
+      bParent.insertBefore(phB, swapTarget);
+      aParent.insertBefore(swapTarget, phA);
+      bParent.insertBefore(el, phB);
+      phA.remove(); phB.remove();
+
+      var change = {
+        type: 'swap',
+        element: desc(el), selector: cssPath(el),
+        swapWith: desc(swapTarget), swapSelector: cssPath(swapTarget),
+        url: location.pathname
+      };
+      var savedA = el, savedB = swapTarget;
+      var savedAParent = aParent, savedANext = aNext;
+      var savedBParent = bParent, savedBNext = bNext;
+      sendChangeWithUndo(change, function() {
+        // Revert: swap back
+        if (savedANext) savedAParent.insertBefore(savedA, savedANext); else savedAParent.appendChild(savedA);
+        if (savedBNext) savedBParent.insertBefore(savedB, savedBNext); else savedBParent.appendChild(savedB);
+      }, function() {
+        // Re-apply swap
+        var phA2 = document.createComment('moldui-swap-a');
+        var phB2 = document.createComment('moldui-swap-b');
+        savedA.parentElement.insertBefore(phA2, savedA);
+        savedB.parentElement.insertBefore(phB2, savedB);
+        phA2.parentElement.insertBefore(savedB, phA2);
+        phB2.parentElement.insertBefore(savedA, phB2);
+        phA2.remove(); phB2.remove();
+      });
+
+      dragSt = null; state.mode = 'select'; selectEl(el);
+      showShimmer('synced', 'Swapped');
+      return;
+    }
+
+    // ── NORMAL REORDER PATH ──
     var targetContainer = dragSt.targetContainer || parent;
     var newIdx = -1;
 
@@ -407,13 +502,10 @@
       targetContainer.insertBefore(el, ph);
       ph.remove();
     }
-    ghost.remove();
-    el.style.opacity = '';
-    el.style.pointerEvents = '';
 
     var moved = (targetContainer !== parent) || (newIdx !== startIdx);
     if (moved) {
-      var change = {
+      var change2 = {
         type: 'reorder', element: desc(el), selector: cssPath(el),
         fromIndex: startIdx, toIndex: newIdx,
         fromParent: cssPath(parent), toParent: cssPath(targetContainer),
@@ -421,8 +513,7 @@
         url: location.pathname
       };
       var savedParent = parent, savedIdx = startIdx, savedEl = el;
-      sendChangeWithUndo(change, function() {
-        // Revert: move element back to original parent at original index
+      sendChangeWithUndo(change2, function() {
         var children = Array.from(savedParent.children);
         if (savedIdx >= children.length) savedParent.appendChild(savedEl);
         else savedParent.insertBefore(savedEl, children[savedIdx]);
@@ -1402,7 +1493,7 @@
   var csB = mk('div', 'moldui-cs-body', cheatsheet);
   var csGroups = [
     { section: 'Selection', items: [['Click', 'Select element'], ['Shift+Click', 'Multi-select'], ['Escape', 'Deselect']] },
-    { section: 'Editing', items: [['Double-click', 'Edit text'], ['Drag', 'Move / reorder'], ['Handles', 'Resize'], ['Arrows', 'Nudge 1px'], ['Shift+Arrows', 'Nudge 10px'], ['Delete', 'Hide element']] },
+    { section: 'Editing', items: [['Double-click', 'Edit text'], ['Drag', 'Move / reorder'], ['Alt+Drag', 'Swap two elements'], ['Handles', 'Resize'], ['Arrows', 'Nudge 1px'], ['Shift+Arrows', 'Nudge 10px'], ['Delete', 'Hide element']] },
     { section: 'Panels', items: [['S', 'Style panel'], ['L', 'Layers panel'], ['Cmd+K', 'Search elements'], ['Cmd+/', 'AI chat'], ['?', 'This cheatsheet']] },
     { section: 'History', items: [['Cmd+Z', 'Undo'], ['Cmd+Shift+Z', 'Redo'], ['Cmd+S', 'Save to source']] },
     { section: 'Zoom', items: [['Cmd+Scroll', 'Zoom canvas'], ['Cmd+0', 'Reset zoom'], ['Cmd+=', 'Zoom in'], ['Cmd+-', 'Zoom out']] },
@@ -1656,5 +1747,165 @@
     }
   };
 
-  console.log('[moldui] v2.2 loaded. Press ? for shortcuts. Cmd+K to search, L for layers, Cmd+/ for AI chat.');
+  // ═════════════════════════════════════════════════════════
+  // v2.3 — Auto-sync: Apply panel + Claude progress + AI suggest
+  // ═════════════════════════════════════════════════════════
+
+  // ── Apply panel: Accept / Reject for pending batches ─────
+  var applyPanel = mk('div', 'moldui-apply-panel', overlay);
+  applyPanel.style.pointerEvents = 'auto';
+  applyPanel.style.display = 'none';
+
+  function showApplyPanel(payload) {
+    while (applyPanel.firstChild) applyPanel.removeChild(applyPanel.firstChild);
+
+    var head = mk('div', 'moldui-ap-head', applyPanel);
+    var icon = mk('span', 'moldui-ap-icon', head);
+    icon.textContent = '✦';
+    var title = mk('span', 'moldui-ap-title', head);
+    title.textContent = payload.changes + ' change' + (payload.changes === 1 ? '' : 's') + ' ready to apply';
+
+    if (payload.sourceHints && payload.sourceHints.length) {
+      var files = mk('div', 'moldui-ap-files', applyPanel);
+      var fileLabel = mk('div', 'moldui-ap-files-label', files);
+      fileLabel.textContent = 'Target files';
+      payload.sourceHints.slice(0, 4).forEach(function(f) {
+        var row = mk('div', 'moldui-ap-file', files);
+        row.textContent = f;
+      });
+    }
+
+    var btns = mk('div', 'moldui-ap-btns', applyPanel);
+    var rejectBtn = document.createElement('button');
+    rejectBtn.className = 'moldui-ap-btn-reject';
+    rejectBtn.textContent = 'Discard';
+    rejectBtn.setAttribute('data-moldui-tip', 'Discard changes · Esc');
+    rejectBtn.addEventListener('click', function() {
+      send({ type: 'reject', payload: { batchFile: payload.batchFile } });
+      hideApplyPanel();
+    });
+    btns.appendChild(rejectBtn);
+
+    var applyBtn = document.createElement('button');
+    applyBtn.className = 'moldui-ap-btn-apply';
+    applyBtn.textContent = payload.claudeAvailable ? 'Apply with Claude' : 'Apply manually';
+    applyBtn.setAttribute('data-moldui-tip', payload.claudeAvailable ? 'Run Claude headless · ⌘↵' : 'Run /moldui-sync yourself');
+    applyBtn.addEventListener('click', function() {
+      if (payload.claudeAvailable) {
+        send({ type: 'apply', payload: { batchFile: payload.batchFile } });
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'Applying...';
+      } else {
+        hideApplyPanel();
+      }
+    });
+    btns.appendChild(applyBtn);
+
+    applyPanel.style.display = 'block';
+    // Listen for Cmd+Enter to apply quickly
+    applyPanel._applyBtn = applyBtn;
+    applyPanel._payload = payload;
+  }
+
+  function hideApplyPanel() {
+    applyPanel.style.display = 'none';
+  }
+
+  // Quick-apply shortcut: Cmd+Enter when apply panel is visible
+  document.addEventListener('keydown', function(e) {
+    if (applyPanel.style.display === 'block' && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (applyPanel._applyBtn && !applyPanel._applyBtn.disabled) applyPanel._applyBtn.click();
+    }
+    if (applyPanel.style.display === 'block' && e.key === 'Escape' && !state.selected && !textEdit) {
+      // Only close apply panel if nothing else is selected/open
+      hideApplyPanel();
+    }
+  }, true);
+
+  // ── Claude progress strip ────────────────────────────────
+  var claudeProg = mk('div', 'moldui-claude-progress', overlay);
+  claudeProg.style.display = 'none';
+
+  function showClaudeProgress(text) {
+    claudeProg.textContent = '';
+    var dot = mk('span', 'moldui-cp-dot', claudeProg);
+    var txt = mk('span', 'moldui-cp-text', claudeProg);
+    txt.textContent = text;
+    claudeProg.style.display = 'flex';
+  }
+  function hideClaudeProgress() { claudeProg.style.display = 'none'; }
+
+  // ── AI Suggest button in toolbar ─────────────────────────
+  var suggestBtn = document.createElement('button');
+  suggestBtn.className = 'moldui-suggest-btn';
+  suggestBtn.textContent = '✨';
+  suggestBtn.setAttribute('data-moldui-tip', 'AI Suggest variations · ⌘⇧S');
+  suggestBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (!state.selected) return;
+    var prompt = window.prompt('Describe what you want (or leave blank for variations):', '') || 'suggest 2-3 design variations';
+    send({ type: 'suggest', payload: { prompt: prompt, element: desc(state.selected), selector: cssPath(state.selected), url: location.pathname } });
+  });
+  toolbar.appendChild(suggestBtn);
+
+  // ── AI Suggest result panel ──────────────────────────────
+  var suggestPanel = mk('div', 'moldui-suggest-panel', overlay);
+  suggestPanel.style.pointerEvents = 'auto';
+  suggestPanel.style.display = 'none';
+
+  function showSuggestPanel(text) {
+    while (suggestPanel.firstChild) suggestPanel.removeChild(suggestPanel.firstChild);
+    var head = mk('div', 'moldui-sgp-head', suggestPanel);
+    var title = mk('span', 'moldui-sgp-title', head);
+    title.textContent = '✨ Suggestions';
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'moldui-sgp-close';
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', function() { suggestPanel.style.display = 'none'; });
+    head.appendChild(closeBtn);
+    var body = mk('div', 'moldui-sgp-body', suggestPanel);
+    // Render text as simple pre-wrapped content (text is markdown from Claude)
+    body.textContent = text || 'No suggestions received.';
+    suggestPanel.style.display = 'block';
+  }
+
+  // ── Hook v2.3 events into the WebSocket handler ──────────
+  var _origHandleServerMsg = handleServerMsg;
+  handleServerMsg = function(msg) {
+    _origHandleServerMsg(msg);
+    if (!msg) return;
+    if (msg.type === 'batch-pending') {
+      showApplyPanel(msg.payload);
+    } else if (msg.type === 'claude-start') {
+      showClaudeProgress('Claude is thinking…');
+    } else if (msg.type === 'claude-progress') {
+      var p = msg.payload || {};
+      var action = p.action === 'reading' ? 'Reading' : p.action === 'edit' ? 'Editing' : p.action === 'write' ? 'Writing' : p.action === 'multiedit' ? 'Editing' : 'Processing';
+      var short = (p.file || '').split('/').slice(-2).join('/');
+      showClaudeProgress(action + ' ' + short);
+    } else if (msg.type === 'claude-done') {
+      var files = (msg.payload && msg.payload.filesTouched) || [];
+      showClaudeProgress('✓ Applied — ' + files.length + ' file' + (files.length === 1 ? '' : 's') + ' changed');
+      setTimeout(hideClaudeProgress, 2500);
+      hideApplyPanel();
+    } else if (msg.type === 'rejected') {
+      hideApplyPanel();
+      showShimmer('synced', 'Changes discarded');
+    } else if (msg.type === 'suggest-start') {
+      showClaudeProgress('Claude is thinking of variations…');
+    } else if (msg.type === 'suggest-result') {
+      hideClaudeProgress();
+      showSuggestPanel(msg.payload && msg.payload.text);
+    } else if (msg.type === 'error') {
+      hideClaudeProgress();
+    }
+  };
+  // Rebind the WebSocket onmessage to use our updated handler
+  (function rebindWS() {
+    if (!ws) { setTimeout(rebindWS, 400); return; }
+    ws.onmessage = function(e) { try { handleServerMsg(JSON.parse(e.data)); } catch(x) {} };
+  })();
+
+  console.log('[moldui] v2.3 loaded. Auto-sync ready. Press ? for shortcuts.');
 })();

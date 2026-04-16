@@ -73,6 +73,19 @@ Each change has a `type` field. Handle them as follows:
 2. Move the child element from `fromIndex` to `toIndex`.
 3. If `fromParent !== toParent`, the element moved to a different container — edit both locations.
 
+### `swap` — Two elements exchange positions
+```json
+{
+  "type": "swap",
+  "element": { "tag": "div", "classes": ["card-a"] },
+  "selector": "main section:nth-of-type(1)",
+  "swapWith": { "tag": "div", "classes": ["card-b"] },
+  "swapSelector": "main section:nth-of-type(3)"
+}
+```
+
+**Steps:** Swap the source positions of the two elements in the same file. If JSX, swap the two JSX nodes.
+
 ### `clone` — Element duplicated
 ```json
 {

@@ -4,8 +4,10 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import open from 'open';
-import { mkdirSync, writeFileSync, readdirSync, unlinkSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync, readdirSync, unlinkSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { spawn } from 'child_process';
+import { execSync } from 'child_process';
 import { createProxy } from '../src/proxy.js';
 import { createWebSocketHub } from '../src/websocket.js';
 import { detectDevServer, detectFramework, findAvailablePort } from '../src/detector.js';
@@ -26,6 +28,8 @@ program
   .option('--ws-port <port>', 'WebSocket port', parseInt)
   .option('--no-open', 'do not auto-open browser')
   .option('--dir <path>', 'project directory', process.cwd())
+  .option('--no-auto-sync', 'disable auto-running Claude on Save (keeps batches in .moldui/)')
+  .option('--auto-apply', 'apply changes without diff preview (default: preview first)')
   .action(async (target, opts) => {
     console.log('');
     console.log(chalk.bold('  moldui'));
@@ -116,6 +120,14 @@ program
       let debounceTimer = null;
       let pendingChanges = [];
 
+      // Auto-sync mode: detect Claude Code CLI
+      const claudeAvailable = opts.autoSync !== false && detectClaude();
+      if (claudeAvailable) {
+        console.log(chalk.green('  Auto-sync:   ') + chalk.cyan('enabled') + chalk.gray(' (Claude Code detected)'));
+      } else if (opts.autoSync !== false) {
+        console.log(chalk.yellow('  Auto-sync:   ') + chalk.gray('disabled (install Claude Code CLI to enable)'));
+      }
+
       // Handle incoming changes
       hub.on('change', (change) => {
         pendingChanges.push(change);
@@ -126,7 +138,7 @@ program
         debounceTimer = setTimeout(() => {
           if (pendingChanges.length === 0) return;
           const batch = pendingChanges.splice(0);
-          syncChanges(batch, framework, projectDir, hub);
+          syncChanges(batch, framework, projectDir, hub, { claudeAvailable, autoApply: opts.autoApply });
         }, 1500);
       });
 
@@ -139,8 +151,37 @@ program
         debounceTimer = setTimeout(() => {
           if (pendingChanges.length === 0) return;
           const batch = pendingChanges.splice(0);
-          syncChanges(batch, framework, projectDir, hub);
+          syncChanges(batch, framework, projectDir, hub, { claudeAvailable, autoApply: opts.autoApply });
         }, 1500);
+      });
+
+      // ── Explicit browser "apply" trigger (Accept button in diff preview) ──
+      hub.on('apply', (payload) => {
+        const batchPath = payload && payload.batchFile;
+        if (!batchPath) return;
+        if (!claudeAvailable) {
+          hub.sendToBrowser({ type: 'error', payload: { message: 'Claude Code CLI not installed. Run /moldui-sync manually.' } });
+          return;
+        }
+        runClaudeSync(projectDir, hub, batchPath);
+      });
+
+      // ── Reject: delete the batch without applying ──
+      hub.on('reject', (payload) => {
+        const batchPath = payload && payload.batchFile;
+        if (batchPath && existsSync(batchPath)) {
+          try { unlinkSync(batchPath); } catch {}
+          hub.sendToBrowser({ type: 'rejected', payload: { file: batchPath.split('/').pop() } });
+        }
+      });
+
+      // ── AI Suggest: generate variations of a selected element ──
+      hub.on('suggest', (payload) => {
+        if (!claudeAvailable) {
+          hub.sendToBrowser({ type: 'error', payload: { message: 'Claude Code CLI needed for AI suggestions.' } });
+          return;
+        }
+        runClaudeSuggest(projectDir, hub, payload);
       });
 
       hub.on('undo', () => {
@@ -300,7 +341,7 @@ function stripChange(c) {
 const estTokens = (str) => Math.ceil(str.length / 4);
 
 // Sync changes to source code by writing batch files that Claude Code picks up
-async function syncChanges(changes, framework, projectDir, hub) {
+async function syncChanges(changes, framework, projectDir, hub, opts = {}) {
   hub.sendToBrowser({ type: 'status', payload: { state: 'writing' } });
 
   // ── Token optimization: dedupe + strip ──
@@ -349,13 +390,160 @@ async function syncChanges(changes, framework, projectDir, hub) {
     console.log(chalk.dim('    · [' + c.type + '] ' + (c.element?.tag || 'el') + ' — ' + summary));
   }
   if (compressed.length > 5) console.log(chalk.dim('    · ...and ' + (compressed.length - 5) + ' more'));
-  console.log(chalk.cyan('\n  In Claude Code: ') + chalk.bold('/moldui-sync'));
-  console.log(chalk.gray('  (or tell any AI to "apply my moldui changes")\n'));
 
-  // Notify browser that the batch is pending
-  const file = uniqueHints[0]?.file || 'source';
-  hub.sendToBrowser({ type: 'synced', payload: { file, changes: compressed.length, pending: true } });
+  // Auto-sync: run Claude headless if --auto-apply is on AND Claude is available
+  if (opts.claudeAvailable && opts.autoApply) {
+    console.log(chalk.cyan('\n  Auto-applying via Claude...\n'));
+    runClaudeSync(projectDir, hub, batchFile);
+    return;
+  }
+
+  // Send batch info to browser so it can show diff preview + Accept/Reject buttons
+  hub.sendToBrowser({
+    type: 'batch-pending',
+    payload: {
+      batchFile,
+      changes: compressed.length,
+      sourceHints: uniqueHints.slice(0, 5).map(h => h.file),
+      claudeAvailable: !!opts.claudeAvailable
+    }
+  });
   hub.sendToBrowser({ type: 'status', payload: { state: 'idle' } });
+
+  if (opts.claudeAvailable) {
+    console.log(chalk.cyan('\n  Browser: ') + chalk.gray('click ') + chalk.bold.cyan('Apply') + chalk.gray(' to run Claude headless'));
+  } else {
+    console.log(chalk.cyan('\n  In Claude Code: ') + chalk.bold('/moldui-sync'));
+    console.log(chalk.gray('  (or tell any AI to "apply my moldui changes")\n'));
+  }
+}
+
+// ── Detect Claude Code CLI ─────────────────────────────────
+// Uses execSync with PATH lookup (no user-controlled input)
+function detectClaude() {
+  try {
+    execSync('command -v claude', { stdio: 'ignore' });
+    return true;
+  } catch { return false; }
+}
+
+// ── Run Claude headless and stream progress to browser ─────
+// Uses spawn with array args (not exec) — no shell, no injection risk.
+// batchFile path comes from our own mkstemp-style Date.now() filename.
+function runClaudeSync(projectDir, hub, batchFile) {
+  hub.sendToBrowser({ type: 'status', payload: { state: 'writing', file: batchFile.split('/').pop() } });
+  hub.sendToBrowser({ type: 'claude-start', payload: { batchFile } });
+
+  const prompt = [
+    'Apply the moldui visual edit batch at ' + batchFile + ' to source code.',
+    'Read the batch JSON, then for each change apply it to the corresponding source file.',
+    'Use sourceHints to locate files. Prefer Tailwind class updates when the project uses Tailwind.',
+    'For text changes: find the oldText and replace with newText.',
+    'For style changes: update CSS/Tailwind classes on the element.',
+    'For reorder/delete/wrap/clone: modify the source accordingly.',
+    'Make minimal edits. Preserve code style. After applying, delete the batch file.',
+    'Report each file you modified as a brief bullet.'
+  ].join('\n');
+
+  const proc = spawn('claude', ['-p', prompt, '--output-format', 'stream-json', '--include-partial-messages', '--dangerously-skip-permissions', '--no-session-persistence'], {
+    cwd: projectDir,
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  const filesTouched = new Set();
+  let buf = '';
+
+  proc.stdout.on('data', (chunk) => {
+    buf += chunk.toString();
+    let idx;
+    while ((idx = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, idx);
+      buf = buf.slice(idx + 1);
+      if (!line.trim()) continue;
+      try {
+        const msg = JSON.parse(line);
+        handleClaudeEvent(msg, hub, filesTouched);
+      } catch { /* partial line */ }
+    }
+  });
+
+  proc.stderr.on('data', (chunk) => { process.stderr.write(chalk.dim(chunk)); });
+
+  proc.on('close', (code) => {
+    hub.sendToBrowser({
+      type: 'claude-done',
+      payload: { success: code === 0, filesTouched: Array.from(filesTouched), batchFile }
+    });
+    hub.sendToBrowser({ type: 'status', payload: { state: 'idle' } });
+    if (code === 0) {
+      console.log(chalk.green('  ✓ Applied') + chalk.gray(' — ' + filesTouched.size + ' file' + (filesTouched.size === 1 ? '' : 's') + ' changed'));
+    } else {
+      console.log(chalk.red('  ✗ Claude exited with code ' + code));
+      hub.sendToBrowser({ type: 'error', payload: { message: 'Claude sync failed (exit ' + code + ')' } });
+    }
+  });
+
+  proc.on('error', (err) => {
+    console.log(chalk.red('  ✗ Failed to run Claude: ' + err.message));
+    hub.sendToBrowser({ type: 'error', payload: { message: 'Failed to run Claude: ' + err.message } });
+  });
+}
+
+// Parse Claude stream-json events and translate into browser events
+function handleClaudeEvent(msg, hub, filesTouched) {
+  if (msg.type === 'assistant' && msg.message && Array.isArray(msg.message.content)) {
+    for (const part of msg.message.content) {
+      if (part.type === 'tool_use' && (part.name === 'Edit' || part.name === 'Write' || part.name === 'MultiEdit')) {
+        const fp = part.input && (part.input.file_path || part.input.path);
+        if (fp) {
+          filesTouched.add(fp);
+          hub.sendToBrowser({ type: 'claude-progress', payload: { action: part.name.toLowerCase(), file: fp } });
+        }
+      } else if (part.type === 'tool_use' && part.name === 'Read') {
+        const fp = part.input && part.input.file_path;
+        if (fp) hub.sendToBrowser({ type: 'claude-progress', payload: { action: 'reading', file: fp } });
+      }
+    }
+  }
+}
+
+// ── AI Suggest: ask Claude for 2-3 variations of a selected element ──
+function runClaudeSuggest(projectDir, hub, payload) {
+  hub.sendToBrowser({ type: 'status', payload: { state: 'writing' } });
+  hub.sendToBrowser({ type: 'suggest-start', payload: {} });
+
+  const el = payload.element || {};
+  const descr = (el.tag || 'element') + (el.id ? '#' + el.id : '') + (el.classes ? '.' + (el.classes || []).join('.') : '');
+  const prompt = [
+    'The user selected this element in their running web app: ' + descr,
+    'Text content: "' + (el.textContent || '').slice(0, 100) + '"',
+    'Selector: ' + (payload.selector || 'n/a'),
+    'URL path: ' + (payload.url || '/'),
+    '',
+    'User context: "' + (payload.prompt || 'suggest 2-3 design variations') + '"',
+    '',
+    'Propose 2-3 concrete design variations as plain text. For each:',
+    '- Name the variation (e.g. "Softer", "Bolder", "Spacious")',
+    '- List the specific CSS/Tailwind changes (3-5 max)',
+    '- Explain in 1 line why it improves the current design',
+    '',
+    'Output only the 2-3 variations as markdown. Do NOT modify any files.',
+  ].join('\n');
+
+  const proc = spawn('claude', ['-p', prompt, '--output-format', 'text', '--no-session-persistence'], {
+    cwd: projectDir,
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  let out = '';
+  proc.stdout.on('data', (c) => { out += c.toString(); });
+  proc.stderr.on('data', (c) => { process.stderr.write(chalk.dim(c)); });
+  proc.on('close', (code) => {
+    hub.sendToBrowser({ type: 'suggest-result', payload: { text: out.trim(), success: code === 0 } });
+    hub.sendToBrowser({ type: 'status', payload: { state: 'idle' } });
+  });
+  proc.on('error', (err) => {
+    hub.sendToBrowser({ type: 'error', payload: { message: 'Failed to run Claude: ' + err.message } });
+  });
 }
 
 // Clean old batch files on startup (keep last 20)

@@ -52,10 +52,21 @@ export function createWebSocketHub(port) {
         emit('save', state.changeQueue.splice(0));
         break;
       case 'chat':
-        // Treat chat prompts as a special change type so they flow into the batch
         state.changeQueue.push({ type: 'chat', ...msg.payload });
         emit('change', { type: 'chat', ...msg.payload });
         emit('chat', msg.payload);
+        break;
+      case 'apply':
+        // Browser requested to apply a pending batch (Accept button)
+        emit('apply', msg.payload);
+        break;
+      case 'reject':
+        // Browser rejected a pending batch
+        emit('reject', msg.payload);
+        break;
+      case 'suggest':
+        // AI Suggest variations button
+        emit('suggest', msg.payload);
         break;
     }
   }

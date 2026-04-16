@@ -47,6 +47,12 @@ This skill reads pending visual edit batches from `.moldui/` in the current proj
    - Move the child element from `fromIndex` to `toIndex`
    - If `fromParent !== toParent`, move the element to a different container
 
+   For **swap changes** (type: `swap`):
+   - The user held Alt while dragging to exchange two elements' positions
+   - Swap the source positions of `selector` and `swapSelector`
+   - If in JSX: swap the two JSX elements in their source tree
+   - If in HTML: swap the two HTML elements
+
    For **clone changes** (type: `clone`):
    - Duplicate the element in source code at the specified position
 

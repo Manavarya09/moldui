@@ -819,3 +819,141 @@
   content: '✦'; color: var(--moldui-primary); margin-right: 6px;
   text-shadow: 0 0 8px currentColor;
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* v2.3 — Auto-sync: Apply panel + Claude progress + Suggest    */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* Apply panel — shows after Save with Accept / Reject */
+.moldui-apply-panel {
+  position: fixed; bottom: 52px; right: 8px; width: 320px;
+  background: var(--moldui-glass-strong);
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--moldui-border-strong); border-radius: 14px;
+  padding: 14px; z-index: 7;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.55), 0 0 32px rgba(34, 211, 238, 0.15);
+  animation: moldui-welcome-in 0.35s cubic-bezier(0.2, 0, 0.2, 1);
+}
+.moldui-ap-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.moldui-ap-icon {
+  color: var(--moldui-primary); font-size: 14px;
+  text-shadow: 0 0 8px currentColor;
+}
+.moldui-ap-title {
+  font: 600 13px/1 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text-heading);
+}
+.moldui-ap-files { margin-bottom: 12px; padding: 8px 10px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--moldui-border); }
+.moldui-ap-files-label {
+  font: 600 9px/1 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text-faint); text-transform: uppercase;
+  letter-spacing: 0.06em; margin-bottom: 5px;
+}
+.moldui-ap-file {
+  font: 400 11px/1.4 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--moldui-text-dim);
+}
+.moldui-ap-btns { display: flex; gap: 6px; }
+.moldui-ap-btn-reject, .moldui-ap-btn-apply {
+  flex: 1; padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  font: 600 12px/1 'Inter', system-ui, sans-serif;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1); border: none;
+}
+.moldui-ap-btn-reject {
+  background: rgba(255,255,255,0.06); color: var(--moldui-text-dim);
+  border: 1px solid var(--moldui-border);
+}
+.moldui-ap-btn-reject:hover { background: rgba(248, 113, 113, 0.12); color: var(--moldui-danger); border-color: rgba(248, 113, 113, 0.3); }
+.moldui-ap-btn-apply {
+  background: linear-gradient(135deg, var(--moldui-primary-dim), var(--moldui-primary));
+  color: #0a0a14;
+  box-shadow: 0 2px 16px rgba(34, 211, 238, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.moldui-ap-btn-apply:hover:not(:disabled) {
+  box-shadow: 0 2px 24px rgba(34, 211, 238, 0.6), inset 0 1px 0 rgba(255,255,255,0.25);
+  transform: translateY(-1px);
+}
+.moldui-ap-btn-apply:disabled { opacity: 0.6; cursor: default; }
+
+/* Claude progress strip (below apply panel) */
+.moldui-claude-progress {
+  position: fixed; bottom: 52px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--moldui-glass-strong);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(34, 211, 238, 0.35); border-radius: 10px;
+  padding: 9px 14px; z-index: 7;
+  box-shadow: 0 8px 32px rgba(34, 211, 238, 0.2);
+  font: 500 12px/1 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text);
+}
+.moldui-cp-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--moldui-primary);
+  box-shadow: 0 0 12px currentColor;
+  animation: moldui-sb-pulse 1s ease-in-out infinite;
+}
+.moldui-cp-text { letter-spacing: 0.01em; }
+
+/* AI Suggest button in toolbar */
+.moldui-suggest-btn {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.15), rgba(244, 114, 182, 0.15)) !important;
+  color: var(--moldui-secondary) !important;
+  border: 1px solid rgba(167, 139, 250, 0.3) !important;
+  padding: 7px 10px !important; border-radius: 8px; font-size: 13px;
+  cursor: pointer; transition: all 0.18s; margin-left: 3px;
+}
+.moldui-suggest-btn:hover {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.3), rgba(244, 114, 182, 0.3)) !important;
+  color: #fff !important;
+  box-shadow: 0 0 16px rgba(167, 139, 250, 0.4);
+  transform: scale(1.05);
+}
+
+/* Suggest result panel */
+.moldui-suggest-panel {
+  position: fixed; top: 60px; right: 8px; width: 360px;
+  max-height: calc(100vh - 120px); display: flex; flex-direction: column;
+  background: var(--moldui-glass-strong);
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--moldui-border-strong); border-radius: 14px;
+  z-index: 7; overflow: hidden;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.55), 0 0 32px rgba(167, 139, 250, 0.15);
+}
+.moldui-sgp-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--moldui-border);
+}
+.moldui-sgp-title {
+  font: 600 13px/1 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text-heading);
+}
+.moldui-sgp-close {
+  background: none; border: none; color: var(--moldui-text-faint);
+  cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px;
+}
+.moldui-sgp-close:hover { color: var(--moldui-text); }
+.moldui-sgp-body {
+  padding: 14px 16px; overflow-y: auto;
+  font: 12px/1.6 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text-dim);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* Swap-drag target highlight (hold Alt while dragging) */
+.moldui-swap-highlight {
+  display: none; border: 2px solid var(--moldui-accent); border-radius: 4px;
+  background: rgba(244, 114, 182, 0.08);
+  pointer-events: none; transition: all 0.08s ease-out;
+  box-shadow: 0 0 20px rgba(244, 114, 182, 0.4), inset 0 0 0 1px rgba(244, 114, 182, 0.25);
+}
+.moldui-swap-highlight::before {
+  content: '⇄ Swap';
+  position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, #ec4899, var(--moldui-accent));
+  color: #fff;
+  padding: 4px 10px; border-radius: 6px;
+  font: 700 10px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.02em; white-space: nowrap;
+  box-shadow: 0 2px 12px rgba(244, 114, 182, 0.5);
+}

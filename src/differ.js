@@ -56,6 +56,9 @@ export function buildSyncPrompt(changes, framework, sourceHints) {
       case 'chat':
         lines.push(`   User prompt: "${c.prompt}"`);
         break;
+      case 'swap':
+        lines.push(`   Swap positions: ${c.selector || 'A'}  <-->  ${c.swapSelector || 'B'}`);
+        break;
     }
     lines.push('');
   }
