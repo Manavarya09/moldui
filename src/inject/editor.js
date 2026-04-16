@@ -283,8 +283,12 @@
   window.addEventListener('scroll', syncSel, true);
   window.addEventListener('resize', syncSel);
 
-  // ── Hover + Click ────────────────────────────────────────
-  document.addEventListener('mousemove', function(e) {
+  // ── Hover + Click (throttled via rAF for perf on large pages) ─
+  var _hoverRaf = null, _hoverEvent = null;
+  function _processHover() {
+    _hoverRaf = null;
+    var e = _hoverEvent;
+    if (!e) return;
     if (state.mode !== 'select') return;
     var el = document.elementFromPoint(e.clientX, e.clientY);
     if (!el || isEditor(el) || el === state.selected) {
@@ -296,12 +300,16 @@
     posBox(hovBox, r);
     hovLabel.style.cssText = 'display:block;position:fixed;top:' + (r.top - 22) + 'px;left:' + r.left + 'px;pointer-events:none;';
     hovLabel.textContent = elLabel(el);
-    // Show spacing guides between selected and hovered element
-    if (state.selected && el !== state.selected && !isEditor(el)) {
-      showGuides(state.selected.getBoundingClientRect(), el.getBoundingClientRect());
+    if (state.selected && el !== state.selected) {
+      showGuides(state.selected.getBoundingClientRect(), r);
     } else {
       hideGuides();
     }
+  }
+  document.addEventListener('mousemove', function(e) {
+    _hoverEvent = e;
+    if (_hoverRaf) return;
+    _hoverRaf = requestAnimationFrame(_processHover);
   }, true);
 
   document.addEventListener('click', function(e) {
@@ -312,7 +320,12 @@
     if (el) selectEl(el); else deselectEl();
   }, true);
 
-  document.addEventListener('click', function(e) { if (state.selected && e.target.closest('a')) e.preventDefault(); }, true);
+  // Suppress ALL link/button navigation + form submits while editor is active
+  document.addEventListener('click', function(e) {
+    if (isEditor(e.target)) return;
+    var a = e.target.closest ? e.target.closest('a, button[type="submit"], input[type="submit"]') : null;
+    if (a) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
 
   // ── Drag Engine ──────────────────────────────────────────
   var dragSt = null;
@@ -322,19 +335,25 @@
     var parent = el.parentElement;
     var sibs = parent ? Array.from(parent.children) : [];
     var ghost = el.cloneNode(true);
-    ghost.style.cssText = 'position:fixed;top:' + r.top + 'px;left:' + r.left + 'px;width:' + r.width + 'px;height:' + r.height + 'px;opacity:0.6;pointer-events:none;z-index:2147483646;transition:none;';
+    // Capture cursor offset relative to element so ghost follows grab point
+    var offsetX = x - r.left, offsetY = y - r.top;
+    ghost.style.cssText = 'position:fixed;top:' + r.top + 'px;left:' + r.left + 'px;width:' + r.width + 'px;height:' + r.height + 'px;opacity:0.6;pointer-events:none;z-index:2147483646;transition:none;margin:0;';
     document.body.appendChild(ghost);
     var ph = document.createElement('div');
     ph.style.cssText = 'width:' + r.width + 'px;height:4px;background:#3b82f6;border-radius:2px;margin:2px 0;transition:all 0.15s;';
-    dragSt = { el: el, x: x, y: y, r: r, parent: parent, sibs: sibs, startIdx: sibs.indexOf(el), ghost: ghost, ph: ph };
+    dragSt = { el: el, x: x, y: y, r: r, offsetX: offsetX, offsetY: offsetY, parent: parent, sibs: sibs, startIdx: sibs.indexOf(el), ghost: ghost, ph: ph };
     el.style.opacity = '0.3';
+    // Hide resize handles + toolbar during drag so they don't block the drop zone
+    handleWrap.style.display = 'none';
+    toolbar.style.display = 'none';
     state.mode = 'drag';
   }
 
   function onDrag(e) {
     if (!dragSt) return;
-    dragSt.ghost.style.top = (dragSt.r.top + e.clientY - dragSt.y) + 'px';
-    dragSt.ghost.style.left = (dragSt.r.left + e.clientX - dragSt.x) + 'px';
+    // Position ghost so cursor stays at the original grab point on the element
+    dragSt.ghost.style.top = (e.clientY - dragSt.offsetY) + 'px';
+    dragSt.ghost.style.left = (e.clientX - dragSt.offsetX) + 'px';
 
     // Find the container under the cursor (skip the ghost and the dragged element)
     dragSt.ghost.style.pointerEvents = 'none';
@@ -546,6 +565,23 @@
     textEdit = null; state.mode = 'select';
   }
 
+  // ── Keyboard Shortcut Guard ──────────────────────────────
+  // Skip shortcuts when user is typing in a form field (in host page OR in our shadow DOM)
+  function isTypingTarget(e) {
+    var t = e.target;
+    if (!t) return false;
+    // Our palette/chat inputs — treat as typing
+    if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return true;
+    if (t.isContentEditable) return true;
+    // contenteditable=true ancestors
+    var cur = t;
+    while (cur && cur !== document.body) {
+      if (cur.contentEditable === 'true') return true;
+      cur = cur.parentElement;
+    }
+    return false;
+  }
+
   // ── Keyboard Shortcuts ───────────────────────────────────
   document.addEventListener('keydown', function(e) {
     if (textEdit) {
@@ -553,26 +589,52 @@
       else if (e.key === 'Escape') cancelText();
       return;
     }
-    if (e.key === 'Escape') deselectEl();
+    // Don't hijack keys while user is typing (except Escape which should always deselect)
+    var typing = isTypingTarget(e);
+    if (e.key === 'Escape') { deselectEl(); return; }
+    if (typing) return;
+
     if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); if (e.shiftKey) performRedo(); else performUndo(); }
     if (e.key === 's' && !e.metaKey && !e.ctrlKey && !textEdit) { e.preventDefault(); toggleStylePanel(); }
-    if (e.key === 'Delete' && state.selected) hideSelectedEl();
-    if (state.selected && !textEdit && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key) >= 0) {
+    // Delete: works for single selection AND multi-selection
+    if (e.key === 'Delete') {
+      if (multiSelected && multiSelected.length > 0) {
+        multiSelected.slice().forEach(function(el) {
+          var old = getComputedStyle(el).display;
+          el.style.display = 'none';
+          var ch = { type: 'style', element: desc(el), selector: cssPath(el), changes: { display: { from: old, to: 'none' } }, url: location.pathname };
+          var se = el, so = old;
+          sendChangeWithUndo(ch, function() { se.style.display = so; }, function() { se.style.display = 'none'; });
+        });
+        multiSelected = [];
+        hideMultiSelectBoxes();
+        return;
+      }
+      if (state.selected) { hideSelectedEl(); return; }
+    }
+    // Arrow nudging: works for single or multi selection
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key) >= 0 && !textEdit) {
+      var targets = (multiSelected && multiSelected.length > 0) ? multiSelected : (state.selected ? [state.selected] : []);
+      if (targets.length === 0) return;
       e.preventDefault();
-      var amount = e.shiftKey ? 10 : 1; // Shift = 10px steps
+      var amount = e.shiftKey ? 10 : 1;
       var prop, dir;
       if (e.key === 'ArrowUp') { prop = 'marginTop'; dir = -1; }
       else if (e.key === 'ArrowDown') { prop = 'marginTop'; dir = 1; }
       else if (e.key === 'ArrowLeft') { prop = 'marginLeft'; dir = -1; }
       else if (e.key === 'ArrowRight') { prop = 'marginLeft'; dir = 1; }
 
-      var cs = getComputedStyle(state.selected);
-      var cur = parseInt(cs[prop]) || 0;
-      var newVal = (cur + dir * amount) + 'px';
-      var oldVal = cs[prop];
-      state.selected.style[prop] = newVal;
+      targets.forEach(function(t) {
+        var cs = getComputedStyle(t);
+        var cur = parseInt(cs[prop]) || 0;
+        var newVal = (cur + dir * amount) + 'px';
+        var oldVal = cs[prop];
+        t.style[prop] = newVal;
+        var tt = t, sp = prop, ov = oldVal, nv = newVal;
+        sendChangeWithUndo({ type: 'style', element: desc(tt), selector: cssPath(tt), changes: { [sp]: { from: ov, to: nv } }, url: location.pathname }, function() { tt.style[sp] = ov; }, function() { tt.style[sp] = nv; });
+      });
       syncSel();
-      sendChange({ type: 'style', element: desc(state.selected), selector: cssPath(state.selected), changes: { [prop]: { from: oldVal, to: newVal } }, url: location.pathname });
+      syncMulti();
     }
   }, true);
 
@@ -644,6 +706,7 @@
   function renderStylePanel(el) {
     var cs = getComputedStyle(el);
     var isFlex = cs.display === 'flex' || cs.display === 'inline-flex';
+    var savedScroll = stylePanel.scrollTop;
 
     // Build panel using DOM methods (safe, no innerHTML with user content)
     while (stylePanel.firstChild) stylePanel.removeChild(stylePanel.firstChild);
@@ -706,6 +769,9 @@
     buildSection(stylePanel, 'Effects', [
       { label: 'Opacity', type: 'range', prop: 'opacity', val: cs.opacity, min: 0, max: 1, step: 0.05 }
     ]);
+
+    // Restore scroll position so switching elements doesn't jump back to top
+    stylePanel.scrollTop = savedScroll;
   }
 
   function buildSection(parent, title, fields) {
@@ -911,7 +977,7 @@
   function updateStatusBar() {
     while (statusBar.firstChild) statusBar.removeChild(statusBar.firstChild);
     statusBar.appendChild(document.createTextNode(state.wsConnected ? '\u{1F7E2} ' : '\u{1F534} '));
-    var items = ['moldui', 'S styles', 'Dbl-click text', 'Esc deselect', 'Cmd+Z undo'];
+    var items = ['moldui', 'S styles', 'L layers', 'Cmd+K search', '? shortcuts', 'Cmd+Z undo'];
     items.forEach(function(t, i) {
       if (i > 0) statusBar.appendChild(document.createTextNode(' \u00b7 '));
       var span = document.createElement('span');
@@ -1009,6 +1075,9 @@
   function hideContextMenu() { contextMenu.style.display = 'none'; }
   document.addEventListener('click', function(e) {
     if (contextMenu.style.display === 'block' && !contextMenu.contains(e.target)) hideContextMenu();
+  }, true);
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && contextMenu.style.display === 'block') hideContextMenu();
   }, true);
 
   contextMenu.addEventListener('click', function(e) {
@@ -1230,7 +1299,7 @@
   chatSendBtn.textContent = 'Send';
   chatIn.appendChild(chatSendBtn);
   var chatHint = mk('div', 'moldui-chat-hint', chatPanel);
-  chatHint.textContent = 'Your prompt + selected element context is sent to Claude Code.';
+  chatHint.textContent = 'Prompts are saved with changes. Ask your AI (Claude / Cursor / Gemini / Copilot) to "apply moldui changes".';
   var chatPanelOpen = false;
 
   function toggleChatPanel() {
@@ -1251,7 +1320,7 @@
     addChatMsg('user', text);
     chatInput.value = '';
     send({ type: 'chat', payload: { prompt: text, element: state.selected ? desc(state.selected) : null, selector: state.selected ? cssPath(state.selected) : null, url: location.pathname } });
-    addChatMsg('ai', 'Queued for Claude Code — run /moldui-sync to apply');
+    addChatMsg('ai', 'Saved with pending changes. Ask your AI to "apply moldui" to sync.');
   }
   chatSendBtn.addEventListener('click', doChatSend);
   chatInput.addEventListener('keydown', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doChatSend(); } });
@@ -1356,6 +1425,8 @@
   ];
 
   function showTourStep() {
+    // Mark as started so reloads don't restart
+    try { localStorage.setItem('__moldui_tour_started__', '1'); } catch(x) {}
     if (tourStep >= tourSteps.length) { endTour(); return; }
     var s = tourSteps[tourStep];
     tourOverlay.style.display = 'block';
@@ -1391,7 +1462,9 @@
   }
   (function maybeStartTour() {
     var seen = false;
-    try { seen = localStorage.getItem('__moldui_tour_done__') === '1'; } catch(x) {}
+    try {
+      seen = localStorage.getItem('__moldui_tour_done__') === '1' || localStorage.getItem('__moldui_tour_started__') === '1';
+    } catch(x) {}
     if (!seen) setTimeout(showTourStep, 900);
   })();
 
@@ -1447,8 +1520,11 @@
   // ── Global keyboard: L, Cmd+K, Cmd+/, ?, Cmd+0, Cmd+=, Cmd+- ─
   document.addEventListener('keydown', function(e) {
     if (textEdit) return;
+    // Cmd+K always works (even while typing in a different input — it's a palette trigger)
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); togglePalette(); return; }
+    // Don't hijack single-letter shortcuts if user is typing somewhere
+    if (isTypingTarget(e)) return;
     if (e.key === 'l' && !e.metaKey && !e.ctrlKey && !paletteOpen) { e.preventDefault(); toggleLayersPanel(); }
-    else if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); togglePalette(); }
     else if ((e.metaKey || e.ctrlKey) && e.key === '/') { e.preventDefault(); toggleChatPanel(); }
     else if (e.key === '?') { e.preventDefault(); toggleCheatsheet(); }
     else if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); zoomLevel = 1; applyZoom(); }

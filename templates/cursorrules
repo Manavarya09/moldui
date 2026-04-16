@@ -1,0 +1,14 @@
+# moldui — Visual Editor Integration
+
+When the user asks you to "sync moldui changes", "apply visual edits", "apply moldui", or similar:
+
+1. Read the full instructions at `.moldui/INSTRUCTIONS.md`
+2. Check for pending batches: `ls .moldui/batch-*.json`
+3. For each batch (oldest first), read it, apply the changes to source code, then delete the batch file
+4. Report back with files modified and a summary
+
+Key change types: `style`, `text`, `reorder`, `clone`, `delete`, `wrap`, `image`, `chat`.
+
+For Tailwind projects: translate px values to Tailwind classes (4px base → e.g., `24px` = `6`).
+Use `sourceHints` in each batch to locate the right source file.
+Make minimal edits. Preserve existing code style.

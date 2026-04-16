@@ -1,0 +1,9 @@
+# moldui integration for Aider
+# When asked to apply moldui changes:
+# 1. Read .moldui/INSTRUCTIONS.md for the protocol
+# 2. Process all .moldui/batch-*.json files (oldest first)
+# 3. Apply changes to source code, delete batch files when done
+
+# Include the instructions in the context
+read:
+  - .moldui/INSTRUCTIONS.md

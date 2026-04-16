@@ -1,0 +1,11 @@
+# moldui Integration
+
+When the user asks to apply moldui changes / sync visual edits:
+
+1. Read `.moldui/INSTRUCTIONS.md` for the full protocol
+2. Process all pending batches in `.moldui/batch-*.json` (oldest first by timestamp)
+3. For each batch: apply the changes to source, delete the batch file
+4. Report files modified
+
+Change types: `style`, `text`, `reorder`, `clone`, `delete`, `wrap`, `image`, `chat`.
+Use `sourceHints` to locate files. Translate CSS → Tailwind for Tailwind projects. Minimal edits.

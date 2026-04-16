@@ -1,0 +1,24 @@
+# moldui — Visual Editor Integration
+
+## Rules for syncing visual edits
+
+When the user requests to sync moldui changes or apply visual edits:
+
+1. Read `.moldui/INSTRUCTIONS.md` for the full protocol
+2. Check `.moldui/batch-*.json` for pending batches, sorted by timestamp
+3. Process each batch chronologically:
+   - Read the JSON batch
+   - Apply changes to source code (use `sourceHints` to locate files)
+   - Delete the batch file when done
+4. Report files modified + summary
+
+## Change types
+
+`style` · `text` · `reorder` · `clone` · `delete` · `wrap` · `image` · `chat`
+
+## Key rules
+
+- For Tailwind projects, translate CSS values to Tailwind utility classes (4px base)
+- Make minimal edits; preserve existing code style
+- Use `sourceHints` (ordered by confidence) to locate source files
+- Delete batch files after successful application
