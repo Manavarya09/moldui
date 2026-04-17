@@ -477,6 +477,14 @@ function runClaudeSync(projectDir, hub, batchFile) {
     hub.sendToBrowser({ type: 'status', payload: { state: 'idle' } });
     if (code === 0) {
       console.log(chalk.green('  ✓ Applied') + chalk.gray(' — ' + filesTouched.size + ' file' + (filesTouched.size === 1 ? '' : 's') + ' changed'));
+      // Suggest a commit message based on the files touched
+      const commitMsg = buildCommitSuggestion(filesTouched);
+      if (commitMsg) {
+        console.log('');
+        console.log(chalk.gray('  Suggested commit:'));
+        console.log(chalk.cyan('    git add -A && git commit -m ' + JSON.stringify(commitMsg)));
+        console.log('');
+      }
     } else {
       console.log(chalk.red('  ✗ Claude exited with code ' + code));
       hub.sendToBrowser({ type: 'error', payload: { message: 'Claude sync failed (exit ' + code + ')' } });
@@ -559,6 +567,18 @@ function cleanOldBatches(projectDir) {
       try { unlinkSync(join(moldDir, f)); } catch {}
     }
   } catch {}
+}
+
+// ── Build a commit message from the files Claude touched ──
+function buildCommitSuggestion(filesTouched) {
+  if (!filesTouched || filesTouched.size === 0) return null;
+  const files = Array.from(filesTouched);
+  // Determine a terse summary from file paths
+  const first = files[0].split('/').pop();
+  if (files.length === 1) {
+    return 'style: visual edits to ' + first + ' via moldui';
+  }
+  return 'style: moldui visual edits across ' + files.length + ' files';
 }
 
 program.parse();

@@ -4,9 +4,9 @@
   /* Brand accents */
   --moldui-primary: #22d3ee;           /* cyan */
   --moldui-primary-dim: #0891b2;
-  --moldui-secondary: #a78bfa;         /* violet */
-  --moldui-secondary-dim: #7c3aed;
-  --moldui-accent: #f472b6;            /* pink */
+  --moldui-secondary: #60a5fa;         /* bright blue */
+  --moldui-secondary-dim: #2563eb;     /* deep blue */
+  --moldui-accent: #818cf8;            /* indigo-blue for swap/accents */
   --moldui-success: #34d399;
   --moldui-danger: #f87171;
   --moldui-warn: #fbbf24;
@@ -20,7 +20,7 @@
 
   /* Neon glow mixes */
   --moldui-glow-cyan: 0 0 0 1px rgba(34, 211, 238, 0.35), 0 0 24px rgba(34, 211, 238, 0.25);
-  --moldui-glow-violet: 0 0 0 1px rgba(167, 139, 250, 0.35), 0 0 24px rgba(167, 139, 250, 0.25);
+  --moldui-glow-blue: 0 0 0 1px rgba(96, 165, 250, 0.35), 0 0 24px rgba(96, 165, 250, 0.25);
 
   /* Text */
   --moldui-text: #e5e7eb;
@@ -43,7 +43,7 @@
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
   background:
     radial-gradient(600px circle at 10% 100%, rgba(34, 211, 238, 0.04), transparent 40%),
-    radial-gradient(500px circle at 100% 0%, rgba(167, 139, 250, 0.04), transparent 40%);
+    radial-gradient(500px circle at 100% 0%, rgba(96, 165, 250, 0.06), transparent 40%);
 }
 
 /* ── Selection & Hover ──────────────────────────────── */
@@ -238,7 +238,7 @@
 .moldui-viewport-bar button.active {
   background: linear-gradient(135deg, var(--moldui-secondary-dim), var(--moldui-secondary));
   color: #fff;
-  box-shadow: 0 2px 12px rgba(167, 139, 250, 0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+  box-shadow: 0 2px 12px rgba(96, 165, 250, 0.4), inset 0 1px 0 rgba(255,255,255,0.15);
 }
 
 /* ── Breadcrumb ─────────────────────────────────────── */
@@ -271,7 +271,7 @@
   backdrop-filter: blur(8px);
 }
 .moldui-shimmer-working {
-  background: linear-gradient(90deg, #0891b2, #22d3ee, #a78bfa, #22d3ee, #0891b2);
+  background: linear-gradient(90deg, #0891b2, #22d3ee, #60a5fa, #22d3ee, #0891b2);
   background-size: 300% 100%;
   animation: moldui-shimmer-move 1.8s linear infinite;
   box-shadow: 0 -8px 32px rgba(34, 211, 238, 0.3);
@@ -444,11 +444,11 @@
 
 .moldui-ab-badge {
   display: none; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, var(--moldui-accent), #ec4899);
+  background: linear-gradient(135deg, var(--moldui-accent), #6366f1);
   color: #fff; font: 700 9px/1 'Inter', system-ui, sans-serif;
   min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px;
   margin-left: 3px;
-  box-shadow: 0 0 12px rgba(244, 114, 182, 0.5);
+  box-shadow: 0 0 12px rgba(129, 140, 248, 0.5);
 }
 
 @keyframes moldui-pulse {
@@ -463,8 +463,8 @@
 /* Multi-select */
 .moldui-multi-boxes { display: none; position: fixed; top: 0; left: 0; pointer-events: none; z-index: 2; }
 .moldui-multi-box {
-  border: 2px solid #8b5cf6; border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(139,92,246,0.3);
+  border: 2px solid #60a5fa; border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.3);
   pointer-events: none;
 }
 
@@ -897,16 +897,16 @@
 
 /* AI Suggest button in toolbar */
 .moldui-suggest-btn {
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.15), rgba(244, 114, 182, 0.15)) !important;
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(129, 140, 248, 0.15)) !important;
   color: var(--moldui-secondary) !important;
-  border: 1px solid rgba(167, 139, 250, 0.3) !important;
+  border: 1px solid rgba(96, 165, 250, 0.3) !important;
   padding: 7px 10px !important; border-radius: 8px; font-size: 13px;
   cursor: pointer; transition: all 0.18s; margin-left: 3px;
 }
 .moldui-suggest-btn:hover {
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.3), rgba(244, 114, 182, 0.3)) !important;
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(129, 140, 248, 0.3)) !important;
   color: #fff !important;
-  box-shadow: 0 0 16px rgba(167, 139, 250, 0.4);
+  box-shadow: 0 0 16px rgba(96, 165, 250, 0.4);
   transform: scale(1.05);
 }
 
@@ -918,7 +918,7 @@
   backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid var(--moldui-border-strong); border-radius: 14px;
   z-index: 7; overflow: hidden;
-  box-shadow: 0 12px 48px rgba(0,0,0,0.55), 0 0 32px rgba(167, 139, 250, 0.15);
+  box-shadow: 0 12px 48px rgba(0,0,0,0.55), 0 0 32px rgba(96, 165, 250, 0.15);
 }
 .moldui-sgp-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -943,17 +943,76 @@
 /* Swap-drag target highlight (hold Alt while dragging) */
 .moldui-swap-highlight {
   display: none; border: 2px solid var(--moldui-accent); border-radius: 4px;
-  background: rgba(244, 114, 182, 0.08);
+  background: rgba(129, 140, 248, 0.08);
   pointer-events: none; transition: all 0.08s ease-out;
-  box-shadow: 0 0 20px rgba(244, 114, 182, 0.4), inset 0 0 0 1px rgba(244, 114, 182, 0.25);
+  box-shadow: 0 0 20px rgba(129, 140, 248, 0.4), inset 0 0 0 1px rgba(129, 140, 248, 0.25);
 }
 .moldui-swap-highlight::before {
   content: '⇄ Swap';
   position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
-  background: linear-gradient(135deg, #ec4899, var(--moldui-accent));
+  background: linear-gradient(135deg, #6366f1, var(--moldui-accent));
   color: #fff;
   padding: 4px 10px; border-radius: 6px;
   font: 700 10px/1 'Inter', system-ui, sans-serif;
   letter-spacing: 0.02em; white-space: nowrap;
-  box-shadow: 0 2px 12px rgba(244, 114, 182, 0.5);
+  box-shadow: 0 2px 12px rgba(129, 140, 248, 0.5);
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* v2.4 — Launch polish                                         */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* Spacing preset chips in style panel */
+.moldui-sp-presets {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--moldui-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+.moldui-sp-preset-row {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+}
+.moldui-sp-preset-row:last-child { margin-bottom: 0; }
+.moldui-sp-preset-label {
+  font: 500 10px/1 'Inter', system-ui, sans-serif;
+  color: var(--moldui-text-faint);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  width: 52px; flex-shrink: 0;
+}
+.moldui-sp-preset-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--moldui-border);
+  color: var(--moldui-text);
+  padding: 4px 10px; border-radius: 6px;
+  font: 500 11px/1 'JetBrains Mono', ui-monospace, monospace;
+  cursor: pointer; transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  flex: 1; min-width: 0;
+}
+.moldui-sp-preset-chip:hover {
+  background: rgba(34, 211, 238, 0.14);
+  border-color: rgba(34, 211, 238, 0.4);
+  color: var(--moldui-primary);
+  transform: translateY(-1px);
+}
+.moldui-sp-preset-chip:active { transform: translateY(0); }
+
+/* Locked element indicator (subtle lock icon on hover) */
+[data-moldui-locked]::after {
+  content: '🔒';
+  position: absolute; top: 2px; right: 2px;
+  font-size: 10px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Apply panel summary */
+.moldui-ap-summary {
+  margin-bottom: 12px; padding: 10px 12px;
+  background: rgba(34, 211, 238, 0.06);
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 8px;
+}
+.moldui-ap-summary-line {
+  font: 500 11px/1.4 'Inter', system-ui, sans-serif;
+  color: var(--moldui-primary);
+  margin-top: 4px;
 }

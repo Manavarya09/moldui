@@ -1907,5 +1907,154 @@
     ws.onmessage = function(e) { try { handleServerMsg(JSON.parse(e.data)); } catch(x) {} };
   })();
 
-  console.log('[moldui] v2.3 loaded. Auto-sync ready. Press ? for shortcuts.');
+  // ═════════════════════════════════════════════════════════
+  // v2.4 — Launch polish: locks, presets, summary, W-key, blue
+  // ═════════════════════════════════════════════════════════
+
+  // ── Element Locking ──────────────────────────────────────
+  // Locked elements can't be selected (prevents accidental edits on a trusted element)
+  var lockedElements = new WeakSet();
+
+  function toggleLock(el) {
+    if (lockedElements.has(el)) {
+      lockedElements.delete(el);
+      el.removeAttribute('data-moldui-locked');
+      showShimmer('synced', 'Unlocked');
+    } else {
+      lockedElements.add(el);
+      el.setAttribute('data-moldui-locked', '1');
+      showShimmer('synced', 'Locked — click-through enabled');
+    }
+  }
+
+  // Override selectEl to respect locks
+  var _origSelectLock = selectEl;
+  selectEl = function(el) {
+    if (el && lockedElements.has(el)) {
+      // Find parent that isn't locked
+      var cur = el.parentElement;
+      while (cur && lockedElements.has(cur)) cur = cur.parentElement;
+      if (cur && cur !== document.body) return _origSelectLock(cur);
+      return;
+    }
+    _origSelectLock(el);
+  };
+
+  // Add "Lock" / "Unlock" to context menu
+  (function addLockToMenu() {
+    var lockItem = document.createElement('div');
+    lockItem.className = 'moldui-cm-item';
+    lockItem.dataset.action = 'lock';
+    lockItem.textContent = 'Lock / Unlock';
+    // Insert before the Delete item if found
+    var items = contextMenu.querySelectorAll('.moldui-cm-item');
+    var deleteItem = null;
+    items.forEach(function(it) { if (it.dataset.action === 'del') deleteItem = it; });
+    if (deleteItem) contextMenu.insertBefore(lockItem, deleteItem);
+    else contextMenu.appendChild(lockItem);
+    // Wire the handler (the existing listener will forward clicks, but `lock` isn't in its switch)
+    lockItem.addEventListener('click', function() {
+      hideContextMenu();
+      if (state.selected) toggleLock(state.selected);
+    });
+  })();
+
+  // ── Quick Spacing Presets (+/− 4/8/16/24) ───────────────
+  // Adds a button strip to the style panel header each time it renders
+  var _origRenderStylePanel = renderStylePanel;
+  renderStylePanel = function(el) {
+    _origRenderStylePanel(el);
+    // Inject preset chips after the header
+    var header = stylePanel.querySelector('.moldui-sp-header');
+    if (!header || stylePanel.querySelector('.moldui-sp-presets')) return;
+
+    var presets = document.createElement('div');
+    presets.className = 'moldui-sp-presets';
+
+    var PRESET_ROWS = [
+      { label: 'Padding', prop: 'padding', steps: [4, 8, 16, 24] },
+      { label: 'Margin',  prop: 'margin',  steps: [4, 8, 16, 24] },
+      { label: 'Radius',  prop: 'borderRadius', steps: [4, 8, 12, 16] }
+    ];
+
+    PRESET_ROWS.forEach(function(row) {
+      var rowEl = document.createElement('div');
+      rowEl.className = 'moldui-sp-preset-row';
+      var lbl = document.createElement('span');
+      lbl.className = 'moldui-sp-preset-label';
+      lbl.textContent = row.label;
+      rowEl.appendChild(lbl);
+      row.steps.forEach(function(n) {
+        var chip = document.createElement('button');
+        chip.className = 'moldui-sp-preset-chip';
+        chip.textContent = n;
+        chip.setAttribute('data-moldui-tip', row.label + ' ' + n + 'px');
+        chip.addEventListener('click', function() {
+          if (!state.selected) return;
+          var cs = getComputedStyle(state.selected);
+          var propCamel = row.prop;
+          var old = cs[propCamel];
+          var newVal = n + 'px';
+          state.selected.style[propCamel] = newVal;
+          syncSel();
+          var savedEl = state.selected, sp = propCamel, ov = old, nv = newVal;
+          sendChangeWithUndo(
+            { type: 'style', element: desc(savedEl), selector: cssPath(savedEl), changes: { [sp]: { from: ov, to: nv } }, url: location.pathname },
+            function() { savedEl.style[sp] = ov; },
+            function() { savedEl.style[sp] = nv; }
+          );
+        });
+        rowEl.appendChild(chip);
+      });
+      presets.appendChild(rowEl);
+    });
+
+    header.parentNode.insertBefore(presets, header.nextSibling);
+  };
+
+  // ── Apply Panel Summary (what Claude will do) ───────────
+  var _origShowApplyPanel = showApplyPanel;
+  showApplyPanel = function(payload) {
+    _origShowApplyPanel(payload);
+    // Add a summary section showing what kinds of changes are pending
+    var existing = applyPanel.querySelector('.moldui-ap-summary');
+    if (existing) existing.remove();
+
+    var summary = document.createElement('div');
+    summary.className = 'moldui-ap-summary';
+    var label = document.createElement('div');
+    label.className = 'moldui-ap-files-label';
+    label.textContent = 'What will change';
+    summary.appendChild(label);
+
+    // Derive a summary from the undo stack (since pendingChanges was cleared after batching)
+    var lastN = undoStack.slice(-payload.changes);
+    var counts = { style: 0, text: 0, reorder: 0, clone: 0, delete: 0, swap: 0, wrap: 0, image: 0, chat: 0 };
+    lastN.forEach(function(e) { if (e && e.change && counts[e.change.type] !== undefined) counts[e.change.type]++; });
+    var line = Object.keys(counts).filter(function(k) { return counts[k] > 0; })
+      .map(function(k) { return counts[k] + ' ' + k + (counts[k] === 1 ? '' : 's'); }).join(' · ');
+    if (line) {
+      var p = document.createElement('div');
+      p.className = 'moldui-ap-summary-line';
+      p.textContent = line;
+      summary.appendChild(p);
+    }
+
+    // Insert summary before the buttons
+    var btns = applyPanel.querySelector('.moldui-ap-btns');
+    if (btns) applyPanel.insertBefore(summary, btns);
+    else applyPanel.appendChild(summary);
+  };
+
+  // ── W key reopens the Welcome card ───────────────────────
+  document.addEventListener('keydown', function(e) {
+    if (textEdit || isTypingTarget(e)) return;
+    if (e.key === 'w' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      welcome.classList.remove('hiding');
+      welcome.style.display = 'block';
+    }
+  }, true);
+
+  console.log('[moldui] v2.4 loaded. Press W to reopen welcome, ? for all shortcuts.');
 })();
