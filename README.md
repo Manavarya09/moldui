@@ -2,48 +2,44 @@
 
 # moldui
 
-### The first visual editor for your **actual codebase**.
+### The visual editor for **real codebases.**
 
-Drag. Resize. Edit text. Swap layouts. In the browser.  
-Claude writes the code.
+Drag, resize, swap, edit text in your browser. Claude writes the code.
 
-[![npm](https://img.shields.io/npm/v/moldui?color=22d3ee&label=npm&style=flat-square)](https://www.npmjs.com/package/moldui)
-[![downloads](https://img.shields.io/npm/dm/moldui?color=60a5fa&style=flat-square)](https://www.npmjs.com/package/moldui)
-[![license](https://img.shields.io/npm/l/moldui?color=34d399&style=flat-square)](./LICENSE)
-[![stars](https://img.shields.io/github/stars/Manavarya09/moldui?style=flat-square&color=f59e0b)](https://github.com/Manavarya09/moldui)
+[![npm](https://img.shields.io/npm/v/moldui?color=22d3ee&label=npm&style=for-the-badge)](https://www.npmjs.com/package/moldui)
+[![downloads](https://img.shields.io/npm/dm/moldui?color=60a5fa&style=for-the-badge)](https://www.npmjs.com/package/moldui)
+[![license](https://img.shields.io/npm/l/moldui?color=34d399&style=for-the-badge)](./LICENSE)
+
+[**moldui.vercel.app**](https://moldui.vercel.app) · [**npm**](https://www.npmjs.com/package/moldui) · [**Issues**](https://github.com/Manavarya09/moldui/issues)
+
+---
+
+https://github.com/Manavarya09/moldui/assets/demo.mp4
+
+<video src="https://raw.githubusercontent.com/Manavarya09/moldui/main/.github/assets/moldui-launch.mp4" autoplay muted loop playsinline width="100%"></video>
 
 ```bash
 npx moldui
 ```
 
-**Zero config.** Auto-detects your dev server. Opens your browser. Injects a Figma-like editor. Every visual change becomes a real commit in your real code.
+Zero config. Auto-detects your dev server. Opens the browser.
+Every visual change becomes a real commit in your real code.
 
 </div>
 
 ---
 
-## 60 seconds
-
-> _▶ 60-second demo GIF here — click → drag → resize → type → Save → Claude writes it to `page.tsx`_
-
-## Why this changes things
+## The 30-second pitch
 
 Every web dev has had this moment:
 
-> "This button needs 8 more pixels of padding."
+> *"This button needs 8 more pixels of padding."*
 
-Then you:
-1. Open IDE
-2. Find the component
-3. Hunt the class
-4. Change the number
-5. Switch to browser
-6. Squint
-7. Repeat
+Then you open your IDE, find the component, hunt the Tailwind class, tweak, save, switch tabs, squint, tweak again. Six steps for two pixels.
 
-**moldui collapses that to one step.** Grab the button. Drag the corner. Done. HMR reloads with real source changes Claude wrote for you.
+**moldui kills that loop.** Grab the button. Drag the corner. Done. Claude rewrites the source file, HMR reloads, you move on.
 
-No plugin to install in your project. No framework lock-in. Works with **Next.js, Vite, Vue, Svelte, Django, Rails, Laravel, Flask, plain HTML** — anything that serves HTML.
+No plugin to install in your project. No framework lock-in. Works with **Next.js, Vite, Vue, Svelte, Django, Rails, Laravel, Flask, plain HTML**.
 
 ## Install & run
 
@@ -51,129 +47,175 @@ No plugin to install in your project. No framework lock-in. Works with **Next.js
 # 1. Start your dev server (any framework)
 npm run dev
 
-# 2. In another terminal
+# 2. In a second terminal
 npx moldui
 ```
 
-Browser opens with your app + the editor overlay. That's the entire setup.
+That's it. The browser opens with your app plus the editor overlay injected.
 
-## What you can do
+## What it does
 
-### Spatial editing (Figma-grade)
-- **Click** to select · **Shift-click** for multi-select
-- **Drag** to reorder · **Alt-drag** to **swap** two elements
-- **Resize handles** on 8 sides · **Arrow keys** to nudge 1px (Shift+Arrow = 10px)
-- **Double-click** text to edit inline · **Delete** to hide
+**Spatial editing that actually feels like a design tool.** Not another "properties panel" bolted onto a preview.
 
-### Live style editor
-Full properties panel: layout, **one-click spacing presets (4/8/16/24px)**, typography, colors with **eyedropper + recent colors**, borders, shadows, effects. All live-preview, all undo-able.
+- Click to select. Shift-click for multi-select.
+- **Drag to reorder.** Alt-drag to **swap** two elements (they literally exchange positions in your source).
+- 8-handle resize. Arrow keys nudge 1px. Shift+Arrow for 10px.
+- Double-click text to edit inline — works on buttons, spans, links, headings.
+- Full style panel: layout, typography, colors (with eyedropper + recent colors), spacing, borders, shadows. **One-click presets** for 4/8/16/24px.
+- **Layers panel** (press `L`) — Figma-style DOM tree.
+- **Cmd+K palette** — fuzzy search any element on the page.
+- **AI chat** (`Cmd+/`) — natural language edits ("make this more modern").
+- **Spacing guides** — hover while selected, see exact pixel distances between elements.
+- **Lock elements** — right-click → Lock, prevents accidental selection.
+- Viewport frames (375/768/1024/1280) with device chrome, not just width resize.
+- Zoom with `Cmd+Scroll` like Figma canvas.
 
-### AI ✨
-- **Apply with Claude** — after Save, Claude runs headlessly and writes the code changes
-- **Live progress** — watch files update as Claude edits them: *"Editing src/app/page.tsx..."*
-- **✨ AI Suggest** — click on any element, get 2-3 design variations from Claude
-- **Auto commit messages** — suggested `git commit -m` after apply
+**And the AI part.** When you click Save:
 
-### Power tools
-- **Layers panel** (`L`) — Figma-style DOM tree
-- **Cmd+K palette** — fuzzy-search any element on the page
-- **Right-click menu** — Duplicate · Wrap · Copy/Paste styles · Copy HTML/CSS · **Lock** · Delete
-- **Viewport frames** — preview 375 / 768 / 1024 / 1280 with device chrome
-- **Zoom** — `Cmd+Scroll` like Figma canvas
-- **Spacing guides** — hover while selected, see exact pixel distances between elements
-- **Lock elements** — right-click → Lock to click-through during editing
+1. Changes get **compressed** — 20 resize drags on one card coalesce into one change (keeps original `from`, latest `to`). Typical batch goes from 8KB to 1.5KB.
+2. A batch file is written to `.moldui/batch-{timestamp}.json`
+3. moldui spawns `claude` headless with `--output-format stream-json`
+4. Claude reads the batch, edits your actual source files
+5. You see live progress **inside the browser overlay**: `Reading page.tsx` → `Editing...` → `✓ Applied, 2 files changed`
+6. Auto-generated git commit message suggested in the terminal
 
-### Keyboard
-Press `?` for the complete cheatsheet. All shortcuts use a single modifier at most.
+No context switch. No "go run /slash-command in another window."
 
 ## How it works
 
 ```
-┌──────────────┐  WebSocket   ┌──────────────┐  spawn('claude') ┌────────────────┐
-│ Browser      │ ───────────► │ moldui proxy │ ───────────────► │ Claude Code    │
-│ (editor)     │              │ (Node.js)    │   headless       │ (reads batch,  │
-└──────────────┘              └──────────────┘                  │  edits source) │
-       ▲                             │                          └────────────────┘
-       │                             ▼                                   │
-       │                      .moldui/batch.json                         │
-       │                                                                 │
-       └─── stream-json events ──────────────────────────────────────────┘
-           (Reading, Editing, Done)
+┌──────────────┐  WebSocket  ┌──────────────┐  spawn('claude') ┌─────────────┐
+│  Browser     │ ──────────► │ moldui proxy │ ───────────────► │ Claude Code │
+│  + overlay   │             │ (Node.js)    │   stream-json    │ (edits your │
+└──────────────┘             └──────────────┘                  │  source)    │
+       ▲                            │                          └─────────────┘
+       │                            ▼                                 │
+       │                    .moldui/batch.json                        │
+       │                                                              │
+       └──── live progress events ───────────────────────────────────┘
+             (Reading, Editing, Applied)
 ```
 
-1. **Proxy injects editor** into your dev server's HTML responses
-2. **You edit visually** — changes apply instantly as CSS overrides
-3. **Click Save** — batch written to `.moldui/batch-{ts}.json`
-4. **Claude runs headlessly** — reads batch, rewrites your real source
-5. **Your HMR kicks in** — browser reloads with real code changes
+1. Proxy wraps your dev server and injects a vanilla-JS editor inside a Shadow DOM
+2. You edit visually — changes apply instantly as CSS overrides in the browser
+3. Click **Save** → batch file written to `.moldui/`
+4. Click **Apply with Claude** in the overlay → `spawn('claude', ['-p', prompt, '--output-format', 'stream-json', '--verbose'])`
+5. Claude reads the batch, maps DOM descriptors to source files, makes minimal edits
+6. Your framework's HMR picks up the real file change and reloads
 
 ## vs the alternatives
 
 | | **moldui** | Lovable | Webflow | v0 | Anthropic Preview |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Works on **your existing codebase** | ✅ | ❌ | ❌ | ❌ | ✅ |
-| **Any framework / any language** | ✅ | ❌ (React only) | ❌ | ❌ | ✅ |
-| **True drag & drop** | ✅ | ❌ (properties) | ✅ | ❌ | ❌ |
-| **Resize handles** | ✅ | ❌ | ✅ | ❌ | ❌ |
-| **Swap two elements (Alt-drag)** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Zero config / any browser** | ✅ | N/A | N/A | N/A | ❌ (desktop app) |
-| **Cross-AI** (Claude / Cursor / Gemini) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Open source** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Free** | ✅ | 💰 | 💰 | 💰 | 💰 |
+| Works on **your existing codebase** | ✓ | — | — | — | ✓ |
+| **Any framework, any language** | ✓ | — (React only) | — | — | ✓ |
+| **True drag and drop** | ✓ | — (props panel) | ✓ | — | — |
+| Resize handles | ✓ | — | ✓ | — | — |
+| **Alt-drag swap** | ✓ | — | — | — | — |
+| Multi-select + bulk edit | ✓ | — | ✓ | — | — |
+| Cross-AI (Claude/Cursor/Gemini/Copilot) | ✓ | — | — | — | — |
+| Works outside a desktop app | ✓ | n/a (hosted) | n/a (hosted) | n/a (hosted) | — |
+| Open source | ✓ | — | — | — | — |
+| Free | ✓ | $$ | $$$ | $$ | $$ |
 
-## Works with
+## Framework support
 
-Ship-tested on: **Next.js** (App + Pages Router), **Vite** (React/Vue/Svelte), **SvelteKit**, **Nuxt**, **Angular**, **Django**, **Rails**, **Laravel**, **Flask**, **FastAPI**, **plain HTML**.
+Battle-tested against:
 
-Cross-AI: **Claude Code** (auto-apply), **Cursor**, **Gemini CLI**, **GitHub Copilot**, **Windsurf**, **Aider**, **Cline** (all use the `.moldui/` batch format).
+<table>
+<tr>
+<td align="center"><b>Next.js</b><br/><sub>App + Pages</sub></td>
+<td align="center"><b>Vite</b><br/><sub>React/Vue/Svelte</sub></td>
+<td align="center"><b>SvelteKit</b></td>
+<td align="center"><b>Nuxt</b></td>
+<td align="center"><b>Angular</b></td>
+</tr>
+<tr>
+<td align="center"><b>Django</b></td>
+<td align="center"><b>Rails</b></td>
+<td align="center"><b>Laravel</b></td>
+<td align="center"><b>Flask</b></td>
+<td align="center"><b>Static HTML</b></td>
+</tr>
+</table>
 
-## Claude Code users
+If your framework serves HTML, moldui works. The proxy doesn't care what rendered it.
 
-Install the plugin for headless auto-apply:
+## Cross-AI support
 
-```bash
-claude plugin install Manavarya09/moldui
-```
+The auto-apply feature needs **Claude Code** installed to run headlessly. But the batch format is AI-agnostic — any assistant can apply your edits by reading `.moldui/INSTRUCTIONS.md`.
 
-Then `npx moldui` auto-detects Claude and runs `/moldui-sync` for you when you click Save. Zero terminal switches.
+| AI | Auto-apply | Manual apply |
+|---|:---:|:---:|
+| **Claude Code** | ✓ (default) | `/moldui-sync` |
+| **Cursor** | — | ask "apply moldui changes" |
+| **GitHub Copilot** | — | ask "apply moldui" |
+| **Gemini CLI** | — | reads `GEMINI.md` |
+| **Windsurf** | — | reads `.windsurfrules` |
+| **Aider** | — | reads `.aider.conf.yml` |
+| **Cline** | — | reads `.clinerules` |
 
-## Keyboard quick reference
+## Keyboard reference
 
 | | |
 |---|---|
+| Click / Shift+Click | Select / multi-select |
+| Double-click | Edit text inline |
+| Drag | Move or reorder |
+| **Alt+Drag** | **Swap two elements** |
+| Arrow keys | Nudge 1px (Shift = 10px) |
 | `S` | Style panel |
 | `L` | Layers panel |
 | `W` | Welcome card |
-| `?` | All shortcuts |
-| `Cmd+K` | Find element |
+| `?` | Full shortcut cheatsheet |
+| `Cmd+K` | Element search |
 | `Cmd+/` | AI chat |
-| `Cmd+S` | Save to source |
 | `Cmd+Z` / `Cmd+Shift+Z` | Undo / Redo |
-| `Cmd+Enter` | Apply pending changes |
-| `Alt+Drag` | Swap two elements |
-| `Arrows` / `Shift+Arrows` | Nudge 1px / 10px |
+| `Cmd+S` | Save to source |
+| `Cmd+Enter` | Apply pending batch |
+| `Cmd+Scroll` / `Cmd+0` | Zoom / reset zoom |
+
+## Claude Code plugin
+
+If you use Claude Code, install the plugin for tightest integration:
+
+```
+claude plugin install Manavarya09/moldui
+```
+
+This wires `/moldui-sync` into Claude and enables the **auto-apply** flow — clicking Save in the browser triggers Claude headlessly, no terminal context-switch.
 
 ## Roadmap
 
 - [x] v1 — drag, resize, text, styles, undo, save
-- [x] v2.0 — multi-select, layers, palette, AI chat, viewport frames
-- [x] v2.2 — glassmorphism theme, token optimization, empty states
-- [x] v2.3 — headless auto-sync, apply panel, ✨ AI Suggest, Alt-drag swap
-- [x] v2.4 — spacing presets, element lock, commit msg generator, all-blue theme
-- [ ] v3.0 — collaborative editing (multiplayer), Figma two-way sync
+- [x] v2.0 — multi-select, layers, Cmd+K palette, AI chat, viewport frames
+- [x] v2.2 — glassmorphism theme, token optimization
+- [x] v2.3 — headless auto-sync, Apply panel, AI Suggest, Alt-drag swap
+- [x] v2.4 — spacing presets, element lock, commit message generator, all-blue theme
+- [ ] v3 — collaborative editing (multiplayer), Figma two-way sync, plugin ecosystem
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md). Core rules: vanilla JS in `src/inject/`, Shadow DOM only, every change undoable.
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Core rules:
+- Editor stays vanilla JS (no framework deps)
+- Shadow DOM only (no style leaks)
+- Every change must be undoable
+- Minimal diffs, match existing code style
+
+## Something to keep in mind
+
+moldui sits between you and your codebase. It's doing a lot of automation: injecting scripts, writing batch files, spawning Claude, rewriting source. I've tried to make it boring and predictable, but **read the diffs before you commit.** That's what the suggested commit-message prompt is for — a quick `git diff` before `git commit -am "..."`.
 
 ## License
 
-MIT © masyv · [GitHub](https://github.com/Manavarya09/moldui) · [npm](https://www.npmjs.com/package/moldui)
+[MIT](./LICENSE) © masyv
 
 ---
 
 <div align="center">
 
-**If moldui shipped a feature you wished existed — [star the repo](https://github.com/Manavarya09/moldui). It genuinely helps.**
+If moldui shipped a feature you wished existed — [star the repo](https://github.com/Manavarya09/moldui). It genuinely helps.
+
+**[Site](https://moldui.vercel.app)** · **[npm](https://www.npmjs.com/package/moldui)** · **[Issues](https://github.com/Manavarya09/moldui/issues)**
 
 </div>
