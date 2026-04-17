@@ -445,7 +445,7 @@ function runClaudeSync(projectDir, hub, batchFile) {
     'Report each file you modified as a brief bullet.'
   ].join('\n');
 
-  const proc = spawn('claude', ['-p', prompt, '--output-format', 'stream-json', '--include-partial-messages', '--dangerously-skip-permissions', '--no-session-persistence'], {
+  const proc = spawn('claude', ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--dangerously-skip-permissions', '--no-session-persistence'], {
     cwd: projectDir,
     stdio: ['ignore', 'pipe', 'pipe']
   });
