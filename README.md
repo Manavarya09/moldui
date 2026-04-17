@@ -14,9 +14,7 @@ Drag, resize, swap, edit text in your browser. Claude writes the code.
 
 ---
 
-https://github.com/Manavarya09/moldui/assets/demo.mp4
-
-<video src="https://raw.githubusercontent.com/Manavarya09/moldui/main/.github/assets/moldui-launch.mp4" autoplay muted loop playsinline width="100%"></video>
+![moldui — visual editor for real codebases, powered by Claude](./.github/assets/demo.gif)
 
 ```bash
 npx moldui
@@ -24,6 +22,8 @@ npx moldui
 
 Zero config. Auto-detects your dev server. Opens the browser.
 Every visual change becomes a real commit in your real code.
+
+[Watch the full 45s demo with audio →](https://github.com/Manavarya09/moldui/raw/main/.github/assets/moldui-launch.mp4)
 
 </div>
 
