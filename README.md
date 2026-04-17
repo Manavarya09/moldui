@@ -1,35 +1,40 @@
-<div align="center">
+<p align="center">
+  <img src="./.github/assets/banner.png" alt="moldui" width="100%" />
+</p>
 
-# moldui
+<p align="center">
+  <a href="https://www.npmjs.com/package/moldui"><img src="https://img.shields.io/npm/v/moldui?color=22d3ee&label=npm&style=for-the-badge" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/moldui"><img src="https://img.shields.io/npm/dm/moldui?color=60a5fa&style=for-the-badge" alt="downloads" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/npm/l/moldui?color=34d399&style=for-the-badge" alt="MIT license" /></a>
+  <a href="https://github.com/Manavarya09/moldui/stargazers"><img src="https://img.shields.io/github/stars/Manavarya09/moldui?color=fbbf24&style=for-the-badge" alt="GitHub stars" /></a>
+</p>
 
-### The visual editor for **real codebases.**
+<p align="center">
+  <a href="https://moldui.vercel.app"><b>Website</b></a> &nbsp;·&nbsp;
+  <a href="https://www.npmjs.com/package/moldui"><b>npm</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/Manavarya09/moldui/issues"><b>Issues</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/Manavarya09/moldui/raw/main/.github/assets/moldui-launch.mp4"><b>Watch the demo</b></a>
+</p>
 
-Drag, resize, swap, edit text in your browser. Claude writes the code.
+<br/>
 
-[![npm](https://img.shields.io/npm/v/moldui?color=22d3ee&label=npm&style=for-the-badge)](https://www.npmjs.com/package/moldui)
-[![downloads](https://img.shields.io/npm/dm/moldui?color=60a5fa&style=for-the-badge)](https://www.npmjs.com/package/moldui)
-[![license](https://img.shields.io/npm/l/moldui?color=34d399&style=for-the-badge)](./LICENSE)
+<p align="center">
+  <img src="./.github/assets/demo.gif" alt="moldui in action — drag, resize, edit text, Claude writes the code" width="100%" />
+</p>
 
-[**moldui.vercel.app**](https://moldui.vercel.app) · [**npm**](https://www.npmjs.com/package/moldui) · [**Issues**](https://github.com/Manavarya09/moldui/issues)
-
----
-
-![moldui — visual editor for real codebases, powered by Claude](./.github/assets/demo.gif)
+<br/>
 
 ```bash
 npx moldui
 ```
 
-Zero config. Auto-detects your dev server. Opens the browser.
-Every visual change becomes a real commit in your real code.
+Zero config. Auto-detects your dev server. Opens the browser. Every visual change becomes a real commit in your real code.
 
-[Watch the full 45s demo with audio →](https://github.com/Manavarya09/moldui/raw/main/.github/assets/moldui-launch.mp4)
-
-</div>
+<br/>
 
 ---
 
-## The 30-second pitch
+## The story
 
 Every web dev has had this moment:
 
@@ -41,7 +46,9 @@ Then you open your IDE, find the component, hunt the Tailwind class, tweak, save
 
 No plugin to install in your project. No framework lock-in. Works with **Next.js, Vite, Vue, Svelte, Django, Rails, Laravel, Flask, plain HTML**.
 
-## Install & run
+<br/>
+
+## Install
 
 ```bash
 # 1. Start your dev server (any framework)
@@ -52,6 +59,15 @@ npx moldui
 ```
 
 That's it. The browser opens with your app plus the editor overlay injected.
+
+Prefer a global install?
+
+```bash
+npm i -g moldui
+moldui
+```
+
+<br/>
 
 ## What it does
 
@@ -81,6 +97,8 @@ That's it. The browser opens with your app plus the editor overlay injected.
 
 No context switch. No "go run /slash-command in another window."
 
+<br/>
+
 ## How it works
 
 ```
@@ -103,6 +121,8 @@ No context switch. No "go run /slash-command in another window."
 5. Claude reads the batch, maps DOM descriptors to source files, makes minimal edits
 6. Your framework's HMR picks up the real file change and reloads
 
+<br/>
+
 ## vs the alternatives
 
 | | **moldui** | Lovable | Webflow | v0 | Anthropic Preview |
@@ -117,6 +137,8 @@ No context switch. No "go run /slash-command in another window."
 | Works outside a desktop app | ✓ | n/a (hosted) | n/a (hosted) | n/a (hosted) | — |
 | Open source | ✓ | — | — | — | — |
 | Free | ✓ | $$ | $$$ | $$ | $$ |
+
+<br/>
 
 ## Framework support
 
@@ -141,6 +163,8 @@ Battle-tested against:
 
 If your framework serves HTML, moldui works. The proxy doesn't care what rendered it.
 
+<br/>
+
 ## Cross-AI support
 
 The auto-apply feature needs **Claude Code** installed to run headlessly. But the batch format is AI-agnostic — any assistant can apply your edits by reading `.moldui/INSTRUCTIONS.md`.
@@ -154,6 +178,8 @@ The auto-apply feature needs **Claude Code** installed to run headlessly. But th
 | **Windsurf** | — | reads `.windsurfrules` |
 | **Aider** | — | reads `.aider.conf.yml` |
 | **Cline** | — | reads `.clinerules` |
+
+<br/>
 
 ## Keyboard reference
 
@@ -175,15 +201,39 @@ The auto-apply feature needs **Claude Code** installed to run headlessly. But th
 | `Cmd+Enter` | Apply pending batch |
 | `Cmd+Scroll` / `Cmd+0` | Zoom / reset zoom |
 
+<br/>
+
 ## Claude Code plugin
 
 If you use Claude Code, install the plugin for tightest integration:
 
-```
+```bash
 claude plugin install Manavarya09/moldui
 ```
 
 This wires `/moldui-sync` into Claude and enables the **auto-apply** flow — clicking Save in the browser triggers Claude headlessly, no terminal context-switch.
+
+<br/>
+
+## Contributing
+
+We welcome contributions — bug reports, feature PRs, framework adapters, docs fixes, issue triage, anything.
+
+**First time?** Pick an issue labeled [`good first issue`](https://github.com/Manavarya09/moldui/labels/good%20first%20issue).
+
+**Ground rules (from [CONTRIBUTING.md](./CONTRIBUTING.md)):**
+
+1. Editor stays vanilla JS — no framework dependencies in `src/inject/`
+2. All editor UI renders inside a Shadow DOM — no style leaks into the host page
+3. Every change type must be undoable — pass a `revertFn` to `sendChangeWithUndo`
+4. Minimal diffs, match existing code style
+5. Run `node -c src/inject/editor.js` before pushing
+
+See the full [CONTRIBUTING guide →](./CONTRIBUTING.md)
+
+**By participating, you agree to the [Code of Conduct](./CODE_OF_CONDUCT.md).**
+
+<br/>
 
 ## Roadmap
 
@@ -194,28 +244,32 @@ This wires `/moldui-sync` into Claude and enables the **auto-apply** flow — cl
 - [x] v2.4 — spacing presets, element lock, commit message generator, all-blue theme
 - [ ] v3 — collaborative editing (multiplayer), Figma two-way sync, plugin ecosystem
 
-## Contributing
+Have an idea? [Open an issue](https://github.com/Manavarya09/moldui/issues/new/choose).
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md). Core rules:
-- Editor stays vanilla JS (no framework deps)
-- Shadow DOM only (no style leaks)
-- Every change must be undoable
-- Minimal diffs, match existing code style
+<br/>
 
 ## Something to keep in mind
 
 moldui sits between you and your codebase. It's doing a lot of automation: injecting scripts, writing batch files, spawning Claude, rewriting source. I've tried to make it boring and predictable, but **read the diffs before you commit.** That's what the suggested commit-message prompt is for — a quick `git diff` before `git commit -am "..."`.
 
+<br/>
+
+## Support
+
+- **Bugs & feature requests:** [Open an issue](https://github.com/Manavarya09/moldui/issues/new/choose)
+- **Discussion:** [GitHub Discussions](https://github.com/Manavarya09/moldui/discussions)
+- **Security:** see [SECURITY.md](./SECURITY.md) — report vulnerabilities privately, not in issues
+
+<br/>
+
 ## License
 
 [MIT](./LICENSE) © masyv
 
----
+<br/>
 
-<div align="center">
-
-If moldui shipped a feature you wished existed — [star the repo](https://github.com/Manavarya09/moldui). It genuinely helps.
-
-**[Site](https://moldui.vercel.app)** · **[npm](https://www.npmjs.com/package/moldui)** · **[Issues](https://github.com/Manavarya09/moldui/issues)**
-
-</div>
+<p align="center">
+  <sub>
+    If moldui shipped a feature you wished existed — <a href="https://github.com/Manavarya09/moldui">star the repo</a>. It genuinely helps.
+  </sub>
+</p>

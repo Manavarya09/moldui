@@ -1,0 +1,90 @@
+name: Bug report
+description: Something isn't working the way it should
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please fill out the details below — it massively speeds up the fix.
+
+  - type: input
+    id: moldui-version
+    attributes:
+      label: moldui version
+      description: Run `moldui --version` in your terminal
+      placeholder: "2.4.2"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      description: Run `node --version`
+      placeholder: "v22.x"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: framework
+    attributes:
+      label: Framework
+      options:
+        - Next.js (App Router)
+        - Next.js (Pages Router)
+        - Vite + React
+        - Vite + Vue
+        - Vite + Svelte
+        - SvelteKit
+        - Nuxt
+        - Angular
+        - Django
+        - Rails
+        - Laravel
+        - Flask / FastAPI
+        - Static HTML
+        - Other (specify below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug
+      placeholder: "When I click the Apply button, Claude starts but exits after 2s with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Minimal steps to reproduce. Be concrete.
+      placeholder: |
+        1. Run `npm run dev` on my Next.js project
+        2. Run `npx moldui`
+        3. Click the button in the browser
+        4. Click Apply
+        5. See error in terminal
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "Claude should edit the file and return success"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Terminal output / console errors
+      description: Paste relevant logs (moldui terminal output + browser console errors)
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else we should know? Custom webpack config, monorepo, unusual dev server setup, etc.

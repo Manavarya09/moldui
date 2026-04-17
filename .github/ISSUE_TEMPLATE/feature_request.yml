@@ -1,0 +1,54 @@
+name: Feature request
+description: Suggest a new capability or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea for moldui? Nice. Fill this in so we can evaluate the fit.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the scenario or pain point. Concrete examples help.
+      placeholder: "When I'm editing a list of cards, I can't select them all at once. I have to shift-click each one."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work? A quick sketch of the interaction is great.
+      placeholder: "Shift+A while hovering a container selects all direct children"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds you've tried, or other approaches you rejected?
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Editor UI (overlay, shortcuts, selection)
+        - Style panel / inputs
+        - AI / Claude integration
+        - Framework-specific source mapping
+        - CLI / proxy behavior
+        - Performance
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, screenshots, links to similar features in other tools are welcome
