@@ -273,3 +273,8 @@ moldui sits between you and your codebase. It's doing a lot of automation: injec
     If moldui shipped a feature you wished existed — <a href="https://github.com/Manavarya09/moldui">star the repo</a>. It genuinely helps.
   </sub>
 </p>
+
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Manavarya09/moldui&type=Date)](https://star-history.com/#Manavarya09/moldui&Date)
