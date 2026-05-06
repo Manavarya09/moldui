@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: Install
+        run: npm ci --no-audit --prefer-offline
+      - name: Verify package.json parses
+        run: node -e "require('./package.json'); console.log('ok')"
+      - name: Lint bin entry exists
+        run: |
+          BIN=$(node -p "Object.values(require('./package.json').bin || {})[0] || ''")
+          test -f "$BIN" && echo "bin OK: $BIN" || (echo "bin missing"; exit 1)
