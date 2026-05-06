@@ -1,4 +1,38 @@
+# Dependencies
 node_modules/
-.DS_Store
-*.log
+.pnp.*
+.yarn/
+
+# Build output
 dist/
+build/
+out/
+.next/
+.turbo/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Misc
+*.tsbuildinfo
+.cache/
+coverage/
