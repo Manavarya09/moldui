@@ -57,7 +57,7 @@ export function detectFramework(dir = process.cwd()) {
 
       // Styling detection
       if (allDeps['tailwindcss']) result.styling = 'tailwind';
-      else if (existsSync(join(dir, 'styled-components')) || allDeps['styled-components']) result.styling = 'styled-components';
+      else if (allDeps['styled-components']) result.styling = 'styled-components';
       else if (allDeps['@emotion/styled']) result.styling = 'emotion';
 
       // Store dev script for auto-start
